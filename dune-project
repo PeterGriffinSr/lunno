@@ -15,12 +15,13 @@
 
 (license MIT)
 
-(documentation https://url/to/documentation)
+(documentation https://github.com/PeterGriffinSr/vsharp)
 
 (package
  (name vsharp)
- (synopsis "Purely functional programming language.")
- (description "VSharp is a purely functional programming language.")
+ (synopsis "A purely functional programming language")
+ (description
+  "VSharp is a purely functional, statically typed programming language.")
  (depends ocaml dune)
  (tags
   ("functional" "language" "typed" "static-typing")))

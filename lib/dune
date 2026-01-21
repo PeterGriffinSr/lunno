@@ -1,2 +1,5 @@
 (library
- (name vsharp))
+ (name vsharplibrary)
+ (public_name vsharp.library))
+
+(ocamllex lexer)

@@ -1,3 +1,4 @@
 *.opam
 test
 _build
+.ocamlformat

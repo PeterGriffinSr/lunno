@@ -11,4 +11,4 @@
 VSharp is a purely functional language for building type-safe systems at scale!
 For more information, see [the website](https://example.com/).
 
-## Support Lunno!
+## Support VSharp!
