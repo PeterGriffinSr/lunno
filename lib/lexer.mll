@@ -49,12 +49,20 @@ rule token = parse
     | int_literal as i {
         (try Integer (Int64.of_string i)
          with Failure _ -> 
-            raise (LexerError ("Invalid integer literal", Lexing.lexeme_start_p lexbuf)))
+            raise (LexerError {
+            code = E_Lex_InvalidInt;
+            msg  = "Invalid integer literal";
+            pos  = Lexing.lexeme_start_p lexbuf;
+        }))
     }
     | float_literal as f { 
         (try FloatingPoint (float_of_string f)
          with Failure _ -> 
-            raise (LexerError ("Invalid float literal", Lexing.lexeme_start_p lexbuf)))
+           raise (LexerError {
+            code = E_Lex_InvalidInt;
+            msg  = "Invalid floating-point literal";
+            pos  = Lexing.lexeme_start_p lexbuf;
+        }))
     }
     | identifier as id { Identifier id }
     | '"' { 
@@ -62,12 +70,22 @@ rule token = parse
       read_string string_buffer lexbuf
     }
     | eof { EndOfFile }
-    | _ as c { raise (LexerError (Printf.sprintf "Unexpected character: %c" c, Lexing.lexeme_start_p lexbuf)) }
+    | _ as c {
+        raise (LexerError {
+            code = E_Lex_UnexpectedChar;
+            msg  = Printf.sprintf "Unexpected character: %S" (String.make 1 c);
+            pos  = Lexing.lexeme_start_p lexbuf;
+        })
+    }
 and read_string buffer = parse
     | '"' { 
         let s = Buffer.contents buffer in
         if String.length s = 0 then
-            raise (LexerError ("Empty string literals are not allowed", Lexing.lexeme_start_p lexbuf))
+            raise (LexerError {
+            code = E_Lex_EmptyString;
+            msg  = "Empty string literals are not allowed";
+            pos  = Lexing.lexeme_start_p lexbuf;
+        })
         else
             String s
     }
@@ -79,13 +97,25 @@ and read_string buffer = parse
             | '"' -> '"'
             | '\'' -> '\''
             | '\\' -> '\\'
-            | _ -> raise (LexerError (Printf.sprintf "Invalid escape sequence '\\%c'" c, Lexing.lexeme_start_p lexbuf))
+            | _ -> raise (LexerError {
+                code = E_Lex_InvalidEscape;
+                msg  = "Invalid escape sequence in string literal";
+                pos  = Lexing.lexeme_start_p lexbuf;
+            })
         in
         Buffer.add_char buffer c;
         read_string buffer lexbuf
     }
-    | '\n' { raise (LexerError ("Newline in string literal", Lexing.lexeme_start_p lexbuf)) }
-    | eof { raise (LexerError ("Unterminated string literal: reached end of file", Lexing.lexeme_start_p lexbuf)) }
+    | '\n' {  raise (LexerError {
+        code = E_Lex_NewlineInString;
+        msg  = "Newline in string literal";
+        pos  = Lexing.lexeme_start_p lexbuf;
+    }) }
+    | eof { raise (LexerError {
+        code = E_Lex_UnterminatedString;
+        msg  = "Unterminated string literal";
+        pos  = Lexing.lexeme_start_p lexbuf;
+    })}
     | _ as c { Buffer.add_char buffer c; read_string buffer lexbuf }
 and read_comment = parse
     | newline { Lexing.new_line lexbuf; token lexbuf }

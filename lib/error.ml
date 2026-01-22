@@ -1,19 +1,37 @@
 open Lexing
 
-exception LexerError of string * position
+type error_code =
+  | E_Lex_UnexpectedChar
+  | E_Lex_InvalidInt
+  | E_Lex_UnterminatedString
+  | E_Lex_InvalidEscape
+  | E_Lex_NewlineInString
+  | E_Lex_EmptyString
 
-let print_error lines = function
-  | LexerError (msg, pos) ->
+exception LexerError of { code : error_code; msg : string; pos : position }
+
+let string_of_code = function
+  | E_Lex_UnexpectedChar -> "E1001"
+  | E_Lex_InvalidInt -> "E1002"
+  | E_Lex_UnterminatedString -> "E1003"
+  | E_Lex_InvalidEscape -> "E1004"
+  | E_Lex_NewlineInString -> "E1005"
+  | E_Lex_EmptyString -> "E1006"
+
+let print_error (lines : string array) = function
+  | LexerError { code; msg; pos } ->
       let line_num = pos.pos_lnum in
-      let col = pos.pos_cnum - pos.pos_bol in
+      let col = pos.pos_cnum - pos.pos_bol + 1 in
+
       let line =
-        if line_num - 1 >= 0 && line_num - 1 < Array.length lines then
+        if line_num > 0 && line_num <= Array.length lines then
           lines.(line_num - 1)
         else ""
       in
-      Printf.eprintf "Error: %s\n" msg;
+
+      Printf.eprintf "Error[%s]: %s\n" (string_of_code code) msg;
       Printf.eprintf " --> line %d, column %d\n" line_num col;
       Printf.eprintf "  %d | %s\n" line_num line;
-      Printf.eprintf "    | %s^\n" (String.make col ' ');
+      Printf.eprintf "    | %s^\n" (String.make (col - 1) ' ');
       flush stderr
   | _ -> ()
