@@ -27,10 +27,7 @@ jobs:
         run: opam install dune odoc
 
       - name: Build project
-        run: dune build
-
-      - name: Build Documentation
-        run: dune build @doc
+        run: opam exec -- dune build
 
   docs:
     name: Build & Deploy Documentation
@@ -47,7 +44,7 @@ jobs:
           ocaml-compiler: 5
 
       - name: Build documentation
-        run: dune build @doc
+        run: opam exec -- dune build @doc
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
