@@ -20,7 +20,7 @@
 
 let identifier = ['a'-'z' 'A'-'Z' '_'](['a'-'z' 'A'-'Z' '_' '\''])*
 let digits = ['0'-'9' '_']+
-let int_literal = digits*
+let int_literal = digits+
 let float_literal =
   digits '.' digits
   (['e' 'E'] ['+' '-']? digits)? 
