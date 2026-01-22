@@ -1,16 +1,18 @@
-name: Build
+name: Build & Docs
 
 on:
-  - push
+  push:
+    branches: [main]
+  pull_request:
 
 jobs:
   build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.os }}
+      fail-fast: false
 
     steps:
       - name: Checkout tree
@@ -21,5 +23,32 @@ jobs:
         with:
           ocaml-compiler: 5
 
-      - run: opam install dune
-      - run: opam exec -- dune build
+      - name: Cache OPAM packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.opam
+          key: opam-${{ runner.os }}-${{ hashFiles('**/*.opam') }}
+          restore-keys: |
+            opam-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: opam install dune odoc
+
+      - name: Build project
+        run: dune build
+
+      - name: Build Documentation
+        run: dune build @doc
+
+      - name: Deploy to Github Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_build/default/_doc/_html
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update OCaml documentation'
+          keep_files: false
+          force_orphan: true
+          enable_jekyll: false
