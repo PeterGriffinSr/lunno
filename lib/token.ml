@@ -1,8 +1,9 @@
-type token =
+type t =
   | Integer of int64
   | FloatingPoint of float
   | String of string
   | Identifier of string
+  | Let
   | Function
   | If
   | Then
@@ -38,6 +39,7 @@ let to_string = function
   | FloatingPoint f -> Printf.sprintf "Float(%g)" f
   | String s -> Printf.sprintf "String(%S)" s
   | Identifier id -> Printf.sprintf "Identifier(%s)" id
+  | Let -> "Let"
   | Function -> "Function"
   | If -> "If"
   | Then -> "Then"

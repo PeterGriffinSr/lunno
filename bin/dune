@@ -1,4 +1,4 @@
 (executable
- (public_name vsharp)
+ (public_name lunnoc)
  (name main)
- (libraries vsharplibrary))
+ (libraries lunno_library))

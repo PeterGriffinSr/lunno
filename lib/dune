@@ -1,5 +1,5 @@
 (library
- (name vsharplibrary)
- (public_name vsharp.library))
+ (name lunno_library)
+ (public_name lunno.library))
 
 (ocamllex lexer)

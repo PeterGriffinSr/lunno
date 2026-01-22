@@ -1,5 +1,18 @@
-open Vsharplibrary
+open Lunno_library
 open Error
+
+let read_file_lines filename =
+  let ic = open_in filename in
+  Fun.protect
+    ~finally:(fun () -> close_in_noerr ic)
+    (fun () ->
+      let lines = ref [] in
+      try
+        while true do
+          lines := input_line ic :: !lines
+        done;
+        [||]
+      with End_of_file -> Array.of_list (List.rev !lines))
 
 let lex lexbuf lines =
   let rec loop acc =
@@ -20,18 +33,8 @@ let () =
   end;
 
   let filename = Sys.argv.(1) in
-  let lines =
-    let ic = open_in filename in
-    let rec read_lines acc =
-      try read_lines (input_line ic :: acc)
-      with End_of_file ->
-        close_in ic;
-        List.rev acc
-    in
-    Array.of_list (read_lines [])
-  in
-
-  let ic = open_in filename in
-  let lexbuf = Lexing.from_channel ic in
+  let lines = read_file_lines filename in
+  let source = String.concat "\n" (Array.to_list lines) in
+  let lexbuf = Lexing.from_string source in
   let _tokens = lex lexbuf lines in
-  close_in ic
+  ()

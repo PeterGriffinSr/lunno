@@ -1,36 +1,39 @@
-type token =
-  | Integer of int64
-  | FloatingPoint of float
-  | String of string
-  | Identifier of string
-  | Function
-  | If
-  | Then
-  | Else
-  | Match
-  | Case
-  | IntegerType
-  | FloatingPointType
-  | StringType
-  | BooleanType
-  | UnitType
-  | LeftParen
-  | RightParen
-  | LeftBrace
-  | RightBrace
-  | LeftBracket
-  | RightBracket
-  | Plus
-  | Minus
-  | Asterisk
-  | Slash
-  | Equal
-  | NotEqual
-  | Less
-  | Greater
-  | Comma
-  | Colon
-  | Arrow
-  | EndOfFile
+(** The [t] type represents all tokens. *)
+type t =
+  | Integer of int64  (** Integer literal. *)
+  | FloatingPoint of float  (** Floating-point literal. *)
+  | String of string  (** String literal. *)
+  | Identifier of string  (** Identifier. *)
+  | Let  (** [let] keyword. *)
+  | Function  (** [function] keyword. *)
+  | If  (** [if] keyword. *)
+  | Then  (** [then] keyword. *)
+  | Else  (** [else] keyword. *)
+  | Match  (** [match] keyword. *)
+  | Case  (** [case] keyword. *)
+  | IntegerType  (** [int] type keyword. *)
+  | FloatingPointType  (** [float] type keyword. *)
+  | StringType  (** [string] type keyword. *)
+  | BooleanType  (** [bool] type keyword. *)
+  | UnitType  (** [unit] type keyword. *)
+  | LeftParen  (** [(] punctuation. *)
+  | RightParen  (** [)] punctuation. *)
+  | LeftBrace  (** [{] punctuation. *)
+  | RightBrace  (** [}] punctuation. *)
+  | LeftBracket  (** [\[] punctuation. *)
+  | RightBracket  (** [\]] punctuation. *)
+  | Plus  (** [+] operator. *)
+  | Minus  (** [-] operator. *)
+  | Asterisk  (** [*] operator. *)
+  | Slash  (** [/] operator. *)
+  | Equal  (** [=] operator. *)
+  | NotEqual  (** [<>] operator. *)
+  | Less  (** [<] operator. *)
+  | Greater  (** [>] operator. *)
+  | Comma  (** [,] punctuation. *)
+  | Colon  (** [:] punctuation. *)
+  | Arrow  (** [->] punctuation. *)
+  | EndOfFile  (** End-of-file marker. *)
 
-val to_string : token -> string
+val to_string : t -> string
+(** [to_string tok] returns a human-readable string representation of [tok]. *)

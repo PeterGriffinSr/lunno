@@ -1,4 +1,11 @@
+# Opam artifacts
 *.opam
-test
-_build
 .ocamlformat
+
+# Build artifacts
+_build
+
+# Editor files
+*.swp
+*~
+.vscode/

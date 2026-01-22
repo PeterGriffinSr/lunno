@@ -1,13 +1,13 @@
 (lang dune 3.20)
 
-(name vsharp)
+(name lunno)
 
 (version 0.1.0)
 
 (generate_opam_files true)
 
 (source
- (github PeterGriffinSr/vsharp))
+ (github PeterGriffinSr/lunno))
 
 (authors "Codezz-Ops")
 
@@ -15,10 +15,10 @@
 
 (license MIT)
 
-(documentation https://github.com/PeterGriffinSr/vsharp)
+(documentation https://github.com/PeterGriffinSr/lunno)
 
 (package
- (name vsharp)
+ (name lunno)
  (synopsis "A purely functional programming language")
  (description
   "VSharp is a purely functional, statically typed programming language.")
