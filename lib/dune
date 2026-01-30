@@ -1,5 +1,7 @@
 (library
- (name lunno_library)
- (public_name lunno.library))
+ (name lunno)
+ (public_name lunno)
+ (wrapped true)
+ (libraries unix))
 
 (ocamllex lexer)

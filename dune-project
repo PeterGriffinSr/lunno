@@ -21,7 +21,7 @@
  (name lunno)
  (synopsis "A purely functional programming language")
  (description
-  "VSharp is a purely functional, statically typed programming language.")
- (depends ocaml dune)
+  "Lunno is a purely functional, statically typed programming language.")
+ (depends ocaml dune ounit2)
  (tags
   ("functional" "language" "typed" "static-typing")))
