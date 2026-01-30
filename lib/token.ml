@@ -10,6 +10,7 @@ type t =
   | Else
   | Match
   | Case
+  | In
   | IntegerType
   | FloatingPointType
   | StringType
@@ -46,6 +47,7 @@ let to_string = function
   | Else -> "Else"
   | Match -> "Match"
   | Case -> "Case"
+  | In -> "In"
   | IntegerType -> "IntegerType"
   | FloatingPointType -> "FloatingPointType"
   | StringType -> "StringType"

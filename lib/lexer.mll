@@ -10,6 +10,7 @@
         "else", Else;
         "match", Match;
         "case", Case;
+        "in", In;
         "int", IntegerType;
         "float", FloatingPointType;
         "string", StringType;

@@ -24,10 +24,10 @@ jobs:
           ocaml-compiler: 5
 
       - name: Install dependencies
-        run: opam install dune
+        run: opam install dune ounit2
 
-      - name: Build project
-        run: opam exec -- dune build
+      - name: Run tests
+        run: opam exec -- dune test
 
   docs:
     name: Build & Deploy Documentation

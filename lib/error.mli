@@ -1,4 +1,3 @@
-(** Lexical error codes used by the lexer. *)
 type error_code =
   | E_Lex_UnexpectedChar
       (** Encountered an unexpected character in the input. *)

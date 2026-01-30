@@ -11,6 +11,7 @@ type t =
   | Else  (** [else] keyword. *)
   | Match  (** [match] keyword. *)
   | Case  (** [case] keyword. *)
+  | In  (** [in] keyword. *)
   | IntegerType  (** [int] type keyword. *)
   | FloatingPointType  (** [float] type keyword. *)
   | StringType  (** [string] type keyword. *)
