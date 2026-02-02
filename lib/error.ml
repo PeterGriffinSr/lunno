@@ -3,6 +3,7 @@ open Lexing
 type error_code =
   | E_Lex_UnexpectedChar
   | E_Lex_InvalidInt
+  | E_Lex_InvalidFloat
   | E_Lex_UnterminatedString
   | E_Lex_InvalidEscape
   | E_Lex_NewlineInString
@@ -13,10 +14,11 @@ exception LexerError of { code : error_code; msg : string; pos : position }
 let string_of_code = function
   | E_Lex_UnexpectedChar -> "E1001"
   | E_Lex_InvalidInt -> "E1002"
-  | E_Lex_UnterminatedString -> "E1003"
-  | E_Lex_InvalidEscape -> "E1004"
-  | E_Lex_NewlineInString -> "E1005"
-  | E_Lex_EmptyString -> "E1006"
+  | E_Lex_InvalidFloat -> "E1003"
+  | E_Lex_UnterminatedString -> "E1004"
+  | E_Lex_InvalidEscape -> "E1005"
+  | E_Lex_NewlineInString -> "E1006"
+  | E_Lex_EmptyString -> "E1007"
 
 let print_error (lines : string array) = function
   | LexerError { code; msg; pos } ->

@@ -1,6 +1,34 @@
-val reserved : (string * Token.t) list
-(** A list of reserved keywords and their corresponding token representations.
+val string_buffer : Buffer.t
+(** A reusable buffer for accumulating characters when parsing string literals.
 *)
+
+val reserved : (string, Token.span -> Token.t) Hashtbl.t
+(** A hashtable of reserved keywords and their corresponding token
+    representations. *)
+
+val strip_underscores : string -> string
+(** [strip_underscores s] returns a new string with all underscore characters
+    ('_') removed from the input string [s].
+
+    This function is useful for processing numeric literals that may include
+    underscores for readability (e.g., "1_000_000" becomes "1000000").
+
+    @param s The input string potentially containing underscores.
+    @return A new string with all underscores removed. *)
+
+val with_pos : Lexing.lexbuf -> (Token.span -> 'a) -> 'a
+(** [with_pos lexbuf ctor] constructs a token using the provided constructor
+    [ctor] and the current lexeme's start and end positions from [lexbuf].
+
+    This function retrieves the start and end positions of the current lexeme in
+    the lexing buffer and applies the constructor [ctor] to create a token with
+    the associated span.
+
+    @param lexbuf The lexing buffer containing the input source code.
+    @param ctor
+      A constructor function that takes a [Token.span] and returns a token of
+      type ['a].
+    @return A token of type ['a] constructed with the current lexeme's span. *)
 
 val token : Lexing.lexbuf -> Token.t
 (** [token lexbuf] reads and returns the next token from the given lexing

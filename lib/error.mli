@@ -3,6 +3,8 @@ type error_code =
       (** Encountered an unexpected character in the input. *)
   | E_Lex_InvalidInt
       (** Invalid integer literal (e.g., too large or malformed). *)
+  | E_Lex_InvalidFloat
+      (** Invalid floating-point literal (e.g., too large or malformed). *)
   | E_Lex_UnterminatedString  (** String literal was not properly closed. *)
   | E_Lex_InvalidEscape  (** Invalid escape sequence in a string literal. *)
   | E_Lex_NewlineInString  (** Newline encountered inside a string literal. *)
