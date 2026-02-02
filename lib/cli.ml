@@ -17,7 +17,7 @@ let read_file_lines filename =
 let lex lexbuf lines =
   let rec loop acc =
     match Lexer.token lexbuf with
-    | Token.EndOfFile -> List.rev acc
+    | Token.EndOfFile _ -> List.rev acc
     | tok -> loop (tok :: acc)
   in
   try loop [] with

@@ -6,7 +6,7 @@ let lex_all s =
   let lexbuf = Lexing.from_string s in
   let rec aux acc =
     match Lexer.token lexbuf with
-    | Token.EndOfFile -> List.rev acc
+    | Token.EndOfFile _ -> List.rev acc
     | tok -> aux (tok :: acc)
   in
   aux []
@@ -18,9 +18,9 @@ let lex_exn s =
 let assert_tokens ~ctxt input expected =
   let actual = lex_all input in
   assert_equal ~ctxt
-    ~printer:(fun toks ->
-      toks |> List.map Token.to_string |> String.concat ", ")
-    expected actual
+    ~printer:(fun toks -> String.concat ", " toks)
+    (expected |> List.map Token.to_string)
+    (actual |> List.map Token.to_string)
 
 let assert_lexer_error ~ctxt input expected_code =
   try
@@ -31,57 +31,117 @@ let assert_lexer_error ~ctxt input expected_code =
 
 let test_simple_tokens ctxt =
   assert_tokens ~ctxt "(){}[]"
-    [ LeftParen; RightParen; LeftBrace; RightBrace; LeftBracket; RightBracket ]
+    [
+      LeftParen (Lexing.dummy_pos, Lexing.dummy_pos);
+      RightParen (Lexing.dummy_pos, Lexing.dummy_pos);
+      LeftBrace (Lexing.dummy_pos, Lexing.dummy_pos);
+      RightBrace (Lexing.dummy_pos, Lexing.dummy_pos);
+      LeftBracket (Lexing.dummy_pos, Lexing.dummy_pos);
+      RightBracket (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
 
 let test_operators ctxt =
-  assert_tokens ~ctxt "+-*//=" [ Plus; Minus; Asterisk; Slash; Slash; Equal ]
+  assert_tokens ~ctxt "+-*//="
+    [
+      Plus (Lexing.dummy_pos, Lexing.dummy_pos);
+      Minus (Lexing.dummy_pos, Lexing.dummy_pos);
+      Asterisk (Lexing.dummy_pos, Lexing.dummy_pos);
+      Slash (Lexing.dummy_pos, Lexing.dummy_pos);
+      Slash (Lexing.dummy_pos, Lexing.dummy_pos);
+      Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
 
 let test_comparisons ctxt =
-  assert_tokens ~ctxt "<<>>" [ Less; NotEqual; Greater ]
+  assert_tokens ~ctxt "<<>>"
+    [
+      Less (Lexing.dummy_pos, Lexing.dummy_pos);
+      NotEqual (Lexing.dummy_pos, Lexing.dummy_pos);
+      Greater (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
 
-let test_punctuation ctxt = assert_tokens ~ctxt ",:->" [ Comma; Colon; Arrow ]
+let test_punctuation ctxt =
+  assert_tokens ~ctxt ",:->"
+    [
+      Comma (Lexing.dummy_pos, Lexing.dummy_pos);
+      Colon (Lexing.dummy_pos, Lexing.dummy_pos);
+      Arrow (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
 
 let test_keywords ctxt =
   assert_tokens ~ctxt "let function if then else match case"
-    [ Let; Function; If; Then; Else; Match; Case ]
+    [
+      Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Function (Lexing.dummy_pos, Lexing.dummy_pos);
+      If (Lexing.dummy_pos, Lexing.dummy_pos);
+      Then (Lexing.dummy_pos, Lexing.dummy_pos);
+      Else (Lexing.dummy_pos, Lexing.dummy_pos);
+      Match (Lexing.dummy_pos, Lexing.dummy_pos);
+      Case (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
 
 let test_types ctxt =
   assert_tokens ~ctxt "int float string bool unit"
-    [ IntegerType; FloatingPointType; StringType; BooleanType; UnitType ]
+    [
+      IntegerType (Lexing.dummy_pos, Lexing.dummy_pos);
+      FloatingPointType (Lexing.dummy_pos, Lexing.dummy_pos);
+      StringType (Lexing.dummy_pos, Lexing.dummy_pos);
+      BooleanType (Lexing.dummy_pos, Lexing.dummy_pos);
+      UnitType (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
 
 let test_identifiers ctxt =
   assert_tokens ~ctxt "foo bar_baz foo'"
-    [ Identifier "foo"; Identifier "bar_baz"; Identifier "foo'" ]
+    [
+      Identifier ("foo", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Identifier ("bar_baz", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Identifier ("foo'", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_keyword_vs_identifier ctxt =
   assert_tokens ~ctxt "letx functiony"
-    [ Identifier "letx"; Identifier "functiony" ]
+    [
+      Identifier ("letx", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Identifier ("functiony", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_integers ctxt =
-  assert_tokens ~ctxt "0 123 1_000" [ Integer 0L; Integer 123L; Integer 1000L ]
+  assert_tokens ~ctxt "0 123 1_000"
+    [
+      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Integer (123L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Integer (1000L, (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_integer_underscores ctxt =
-  assert_tokens ~ctxt "1_2_3 0_0_0" [ Integer 123L; Integer 0L ]
+  assert_tokens ~ctxt "1_2_3 0_0_0"
+    [
+      Integer (123L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_floats ctxt =
   assert_tokens ~ctxt "1.0 3.14 2.5e10 1.2E-3"
     [
-      FloatingPoint 1.0;
-      FloatingPoint 3.14;
-      FloatingPoint 2.5e10;
-      FloatingPoint 1.2e-3;
+      FloatingPoint (1.0, (Lexing.dummy_pos, Lexing.dummy_pos));
+      FloatingPoint (3.14, (Lexing.dummy_pos, Lexing.dummy_pos));
+      FloatingPoint (2.5e10, (Lexing.dummy_pos, Lexing.dummy_pos));
+      FloatingPoint (1.2e-3, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_invalid_integer ctxt =
   assert_lexer_error ~ctxt "999999999999999999999999999" E_Lex_InvalidInt
 
-let test_simple_string ctxt = assert_tokens ~ctxt "\"hello\"" [ String "hello" ]
+let test_simple_string ctxt =
+  assert_tokens ~ctxt "\"hello\""
+    [ String ("hello", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
 
 let test_complex_strings ctxt =
-  assert_tokens ~ctxt "\"hello\\nworld\\t!\\\\\"" [ String "hello\nworld\t!\\" ]
+  assert_tokens ~ctxt "\"hello\\nworld\\t!\\\\\""
+    [ String ("hello\nworld\t!\\", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
 
 let test_string_escapes ctxt =
-  assert_tokens ~ctxt "\"a\\n\\t\\r\\\\\\\"\"" [ String "a\n\t\r\\\"" ]
+  assert_tokens ~ctxt "\"a\\n\\t\\r\\\\\\\"\""
+    [ String ("a\n\t\r\\\"", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
 
 let test_empty_string ctxt = assert_lexer_error ~ctxt "\"\"" E_Lex_EmptyString
 
@@ -95,16 +155,33 @@ let test_invalid_escape ctxt =
   assert_lexer_error ~ctxt "\"\\x\"" E_Lex_InvalidEscape
 
 let test_comments ctxt =
-  assert_tokens ~ctxt "let # this is a comment\n x" [ Let; Identifier "x" ]
+  assert_tokens ~ctxt "let # this is a comment\n x"
+    [
+      Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_multiple_comments ctxt =
-  assert_tokens ~ctxt "let #comment1\n #comment2\n x" [ Let; Identifier "x" ]
+  assert_tokens ~ctxt "let #comment1\n #comment2\n x"
+    [
+      Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_whitespace ctxt =
-  assert_tokens ~ctxt "   \n\t let   x   " [ Let; Identifier "x" ]
+  assert_tokens ~ctxt "   \n\t let   x   "
+    [
+      Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_whitespace_variants ctxt =
-  assert_tokens ~ctxt "let\t x \r\n y" [ Let; Identifier "x"; Identifier "y" ]
+  assert_tokens ~ctxt "let\t x \r\n y"
+    [
+      Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Identifier ("y", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_unexpected_char ctxt =
   assert_lexer_error ~ctxt "@" E_Lex_UnexpectedChar
@@ -116,20 +193,31 @@ let test_small_program ctxt =
   let code = "let x = 42 in if x > 0 then x else 0" in
   assert_tokens ~ctxt code
     [
-      Let;
-      Identifier "x";
-      Equal;
-      Integer 42L;
-      In;
-      If;
-      Identifier "x";
-      Greater;
-      Integer 0L;
-      Then;
-      Identifier "x";
-      Else;
-      Integer 0L;
+      Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+      Integer (42L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      In (Lexing.dummy_pos, Lexing.dummy_pos);
+      If (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Greater (Lexing.dummy_pos, Lexing.dummy_pos);
+      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Then (Lexing.dummy_pos, Lexing.dummy_pos);
+      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Else (Lexing.dummy_pos, Lexing.dummy_pos);
+      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
+
+let test_many_identifiers ctxt =
+  let input =
+    String.concat " " (List.init 1000 (fun i -> "x" ^ string_of_int i))
+  in
+  let expected =
+    List.init 1000 (fun i ->
+        Token.Identifier
+          ("x" ^ string_of_int i, (Lexing.dummy_pos, Lexing.dummy_pos)))
+  in
+  assert_tokens ~ctxt input expected
 
 let suite =
   "lunno lexer tests"
@@ -160,6 +248,7 @@ let suite =
          "unexpected char" >:: test_unexpected_char;
          "unexpected unicode" >:: test_unexpected_unicode;
          "small program" >:: test_small_program;
+         "stress identifiers" >:: test_many_identifiers;
        ]
 
 let () = run_test_tt_main suite
