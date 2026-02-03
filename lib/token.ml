@@ -11,7 +11,6 @@ type t =
   | Then of span
   | Else of span
   | Match of span
-  | Case of span
   | In of span
   | IntegerType of span
   | FloatingPointType of span
@@ -48,7 +47,6 @@ let to_string = function
   | Then _ -> "Then"
   | Else _ -> "Else"
   | Match _ -> "Match"
-  | Case _ -> "Case"
   | In _ -> "In"
   | IntegerType _ -> "IntegerType"
   | FloatingPointType _ -> "FloatingPointType"
