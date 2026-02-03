@@ -1,1 +1,50 @@
-"\x"
+function fib(n) = { # Inferred recursive fibbonacci function (int -> int)
+    if n <= 1 then n
+    else fib(n - 1) + fib(n - 2)
+}
+
+function fib(n: int): int = { # Annotated recursive fibbonacci function
+    match n {
+        | 0 -> 0
+        | 1 -> 1
+        | _ -> fib(n - 1) + fib(n - 2)
+    }
+}
+
+function hof(f: function(int) -> int, n: int): int = { # Higher-order function taking a function as argument
+    f(n)
+}
+
+function hod(f, n) = { # Polymorphic higher-order function ('a -> 'b) -> 'a
+    f(n)
+}
+
+function closure(x: int): function(int) -> int = { # Function returning a closure
+    function(y: int): int = {
+        x + y
+    }
+}
+
+function closure(x) = { # Polymorphic function returning a closure ('a) -> ('b -> 'c) 
+    function(y) = {
+        x + y
+    }
+}
+
+function match_with_guard(n: int): int = { # Pattern matching with guards
+    match n {
+        | x if x < 0 -> -1
+        | x if x = 0 -> 0
+        | n -> n + 1
+    }
+}
+
+function nested_match(n: int): int = { # Nested pattern matching
+    match n {
+        | 0 -> 0
+        | _ -> match n - 1 {
+            | 0 -> 1
+            | _ -> 2
+        }
+    }
+}

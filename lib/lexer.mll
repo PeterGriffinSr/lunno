@@ -10,7 +10,6 @@
         "then", (fun span -> Then span);
         "else", (fun span -> Else span);
         "match", (fun span -> Match span);
-        "case", (fun span -> Case span);
         "in", (fun span -> In span);
         "int", (fun span -> IntegerType span);
         "float", (fun span -> FloatingPointType span);
@@ -65,7 +64,7 @@ rule token = parse
                 raise (LexerError {
                     code = E_Lex_InvalidFloat;
                     msg  = "Invalid floating-point literal";
-                    pos  = Lexing.lexeme_start_p lexbuf;
+                    span = span;
                 }))
     }
     | int_literal as i {
@@ -75,7 +74,7 @@ rule token = parse
                 raise (LexerError {
                     code = E_Lex_InvalidInt;
                     msg  = "Invalid integer literal";
-                    pos  = Lexing.lexeme_start_p lexbuf;
+                    span = span;
                 }))
     }
     | identifier as id { 
@@ -91,25 +90,25 @@ rule token = parse
     | eof { let pos = Lexing.lexeme_start_p lexbuf in 
         EndOfFile (pos, pos) }
     | _ as c {
-        raise (LexerError {
-            code = E_Lex_UnexpectedChar;
-            msg  = Printf.sprintf "Unexpected character: %S" (String.make 1 c);
-            pos  = Lexing.lexeme_start_p lexbuf;
-        })
+        with_pos lexbuf (fun span ->
+            raise (LexerError {
+                code = E_Lex_UnexpectedChar;
+                msg  = Printf.sprintf "Unexpected character: %S" (String.make 1 c);
+                span = span;
+            }))
     }
 and read_string buffer start_pos = parse
     | '"' { 
-        with_pos lexbuf (fun span ->
+        with_pos lexbuf (fun end_span ->
             let s = Buffer.contents buffer in
             if String.length s = 0 then 
-            raise (LexerError {
-                code = E_Lex_EmptyString;
-                msg  = "Empty string literals are not allowed";
-                pos  = start_pos;
-            })
+                raise (LexerError {
+                    code = E_Lex_EmptyString;
+                    msg  = "Empty string literals are not allowed";
+                    span = (start_pos, snd end_span);
+                })
             else
-                String (s, span)
-        )
+                String (s, end_span))
     }
     | '\\' (['\\' 'n' 't' 'r' '"' '\''] as c) {
         let c = match c with
@@ -128,21 +127,21 @@ and read_string buffer start_pos = parse
       raise (LexerError {
         code = E_Lex_InvalidEscape;
         msg  = Printf.sprintf "Invalid escape sequence in string literal '\\%c'" c;
-        pos  = Lexing.lexeme_start_p lexbuf;
+        span = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf);
       })
     }
     | '\n' {  
         raise (LexerError {
             code = E_Lex_NewlineInString;
             msg  = "Newline in string literal";
-            pos  = Lexing.lexeme_start_p lexbuf;
+            span = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf);
         }) 
     }
     | eof { 
         raise (LexerError {
             code = E_Lex_UnterminatedString;
             msg  = "Unterminated string literal";
-            pos  = start_pos;
+            span = (start_pos, Lexing.lexeme_end_p lexbuf);
         })
     }
     | _ as c { Buffer.add_char buffer c; read_string buffer start_pos lexbuf }

@@ -13,7 +13,6 @@ type t =
   | Then of span  (** [then] keyword. *)
   | Else of span  (** [else] keyword. *)
   | Match of span  (** [match] keyword. *)
-  | Case of span  (** [case] keyword. *)
   | In of span  (** [in] keyword. *)
   | IntegerType of span  (** [int] type keyword. *)
   | FloatingPointType of span  (** [float] type keyword. *)

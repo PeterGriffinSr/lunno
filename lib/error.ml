@@ -9,7 +9,7 @@ type error_code =
   | E_Lex_NewlineInString
   | E_Lex_EmptyString
 
-exception LexerError of { code : error_code; msg : string; pos : position }
+exception LexerError of { code : error_code; msg : string; span : Token.span }
 
 let string_of_code = function
   | E_Lex_UnexpectedChar -> "E1001"
@@ -21,9 +21,9 @@ let string_of_code = function
   | E_Lex_EmptyString -> "E1007"
 
 let print_error (lines : string array) = function
-  | LexerError { code; msg; pos } ->
-      let line_num = pos.pos_lnum in
-      let col = pos.pos_cnum - pos.pos_bol + 1 in
+  | LexerError { code; msg; span = start_pos, _ } ->
+      let line_num = start_pos.pos_lnum in
+      let col = start_pos.pos_cnum - start_pos.pos_bol + 1 in
 
       let line =
         if line_num > 0 && line_num <= Array.length lines then
