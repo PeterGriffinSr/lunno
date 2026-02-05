@@ -1,6 +1,6 @@
 {
-    open Token
-    open Error
+    open Parser
+    open Lunno_common.Error
     let string_buffer = Buffer.create 64
     let reserved = 
         Hashtbl.of_seq (List.to_seq [
@@ -52,11 +52,13 @@ rule token = parse
     | "/" { with_pos lexbuf (fun span -> Slash span) }
     | "->" { with_pos lexbuf (fun span -> Arrow span) }
     | "<>" { with_pos lexbuf (fun span -> NotEqual span) }
+    | "::" { with_pos lexbuf (fun span -> Cons span) }
     | "=" { with_pos lexbuf (fun span -> Equal span) }
     | "<" { with_pos lexbuf (fun span -> Less span) }
     | ">" { with_pos lexbuf (fun span -> Greater span) }
     | "," { with_pos lexbuf (fun span -> Comma span) }
     | ":" { with_pos lexbuf (fun span -> Colon span) }
+    | "|" { with_pos lexbuf (fun span -> Pipe span) }
     | float_literal as f {
         with_pos lexbuf (fun span ->
             try FloatingPoint (float_of_string (strip_underscores f), span)

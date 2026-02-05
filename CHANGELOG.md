@@ -8,13 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Notes
-- Early development.
-- No stability guarantees.
+- Project is under active early development.
+- APIs and language features may change without notice.
+
+## [0.2.0] - 2026-02-05
+
+### Added
+- Initial parser infrastructure.
+- Core AST definitions and data structures.
+
+### Changed
+- Reorganized project structure to improve dependency management and modularity.
+- Simplified public API to expose only necessary libraries and interfaces.
 
 ## [0.1.0] - 2026-02-02
 
 ### Added
-- Changelog.
+- Initial project changelog.
 - Lexer with full token coverage.
 - Span-based error reporting.
 

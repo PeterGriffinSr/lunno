@@ -14,7 +14,7 @@ exception
   LexerError of {
     code : error_code;  (** The kind of lexical error. *)
     msg : string;  (** A human-readable error message. *)
-    span : Token.span;  (** Span in the source where the error occurred. *)
+    span : Span.t;  (** Span in the source where the error occurred. *)
   }
 (** Exception raised by the lexer on lexical errors. *)
 

@@ -1,12 +1,12 @@
 open OUnit2
-open Lunno
-open Error
+open Lunno_frontend
+open Lunno_common.Error
 
 let lex_all s =
   let lexbuf = Lexing.from_string s in
   let rec aux acc =
     match Lexer.token lexbuf with
-    | Token.EndOfFile _ -> List.rev acc
+    | Parser.EndOfFile _ -> List.rev acc
     | tok -> aux (tok :: acc)
   in
   aux []
@@ -32,100 +32,99 @@ let assert_lexer_error ~ctxt input expected_code =
 let test_simple_tokens ctxt =
   assert_tokens ~ctxt "(){}[]"
     [
-      LeftParen (Lexing.dummy_pos, Lexing.dummy_pos);
-      RightParen (Lexing.dummy_pos, Lexing.dummy_pos);
-      LeftBrace (Lexing.dummy_pos, Lexing.dummy_pos);
-      RightBrace (Lexing.dummy_pos, Lexing.dummy_pos);
-      LeftBracket (Lexing.dummy_pos, Lexing.dummy_pos);
-      RightBracket (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.LeftParen (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.RightParen (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.LeftBrace (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.RightBrace (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.LeftBracket (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.RightBracket (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_operators ctxt =
   assert_tokens ~ctxt "+-*//="
     [
-      Plus (Lexing.dummy_pos, Lexing.dummy_pos);
-      Minus (Lexing.dummy_pos, Lexing.dummy_pos);
-      Asterisk (Lexing.dummy_pos, Lexing.dummy_pos);
-      Slash (Lexing.dummy_pos, Lexing.dummy_pos);
-      Slash (Lexing.dummy_pos, Lexing.dummy_pos);
-      Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Plus (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Minus (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Asterisk (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Slash (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Slash (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_comparisons ctxt =
   assert_tokens ~ctxt "<<>>"
     [
-      Less (Lexing.dummy_pos, Lexing.dummy_pos);
-      NotEqual (Lexing.dummy_pos, Lexing.dummy_pos);
-      Greater (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Less (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.NotEqual (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Greater (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_punctuation ctxt =
   assert_tokens ~ctxt ",:->"
     [
-      Comma (Lexing.dummy_pos, Lexing.dummy_pos);
-      Colon (Lexing.dummy_pos, Lexing.dummy_pos);
-      Arrow (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Comma (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Colon (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Arrow (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_keywords ctxt =
-  assert_tokens ~ctxt "let function if then else match case"
+  assert_tokens ~ctxt "let function if then else match"
     [
-      Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Function (Lexing.dummy_pos, Lexing.dummy_pos);
-      If (Lexing.dummy_pos, Lexing.dummy_pos);
-      Then (Lexing.dummy_pos, Lexing.dummy_pos);
-      Else (Lexing.dummy_pos, Lexing.dummy_pos);
-      Match (Lexing.dummy_pos, Lexing.dummy_pos);
-      Case (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Function (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.If (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Then (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Else (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Match (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_types ctxt =
   assert_tokens ~ctxt "int float string bool unit"
     [
-      IntegerType (Lexing.dummy_pos, Lexing.dummy_pos);
-      FloatingPointType (Lexing.dummy_pos, Lexing.dummy_pos);
-      StringType (Lexing.dummy_pos, Lexing.dummy_pos);
-      BooleanType (Lexing.dummy_pos, Lexing.dummy_pos);
-      UnitType (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.IntegerType (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.FloatingPointType (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.StringType (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.BooleanType (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.UnitType (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_identifiers ctxt =
   assert_tokens ~ctxt "foo bar_baz foo'"
     [
-      Identifier ("foo", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Identifier ("bar_baz", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Identifier ("foo'", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("foo", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("bar_baz", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("foo'", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_keyword_vs_identifier ctxt =
   assert_tokens ~ctxt "letx functiony"
     [
-      Identifier ("letx", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Identifier ("functiony", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("letx", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("functiony", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_integers ctxt =
   assert_tokens ~ctxt "0 123 1_000"
     [
-      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Integer (123L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Integer (1000L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Integer (123L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Integer (1000L, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_integer_underscores ctxt =
   assert_tokens ~ctxt "1_2_3 0_0_0"
     [
-      Integer (123L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Integer (123L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_floats ctxt =
   assert_tokens ~ctxt "1.0 3.14 2.5e10 1.2E-3"
     [
-      FloatingPoint (1.0, (Lexing.dummy_pos, Lexing.dummy_pos));
-      FloatingPoint (3.14, (Lexing.dummy_pos, Lexing.dummy_pos));
-      FloatingPoint (2.5e10, (Lexing.dummy_pos, Lexing.dummy_pos));
-      FloatingPoint (1.2e-3, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.FloatingPoint (1.0, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.FloatingPoint (3.14, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.FloatingPoint (2.5e10, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.FloatingPoint (1.2e-3, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_invalid_integer ctxt =
@@ -133,15 +132,17 @@ let test_invalid_integer ctxt =
 
 let test_simple_string ctxt =
   assert_tokens ~ctxt "\"hello\""
-    [ String ("hello", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+    [ Parser.String ("hello", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
 
 let test_complex_strings ctxt =
   assert_tokens ~ctxt "\"hello\\nworld\\t!\\\\\""
-    [ String ("hello\nworld\t!\\", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+    [
+      Parser.String ("hello\nworld\t!\\", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
 
 let test_string_escapes ctxt =
   assert_tokens ~ctxt "\"a\\n\\t\\r\\\\\\\"\""
-    [ String ("a\n\t\r\\\"", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+    [ Parser.String ("a\n\t\r\\\"", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
 
 let test_empty_string ctxt = assert_lexer_error ~ctxt "\"\"" E_Lex_EmptyString
 
@@ -157,30 +158,30 @@ let test_invalid_escape ctxt =
 let test_comments ctxt =
   assert_tokens ~ctxt "let # this is a comment\n x"
     [
-      Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_multiple_comments ctxt =
   assert_tokens ~ctxt "let #comment1\n #comment2\n x"
     [
-      Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_whitespace ctxt =
   assert_tokens ~ctxt "   \n\t let   x   "
     [
-      Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_whitespace_variants ctxt =
   assert_tokens ~ctxt "let\t x \r\n y"
     [
-      Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Identifier ("y", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("y", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_unexpected_char ctxt =
@@ -193,19 +194,19 @@ let test_small_program ctxt =
   let code = "let x = 42 in if x > 0 then x else 0" in
   assert_tokens ~ctxt code
     [
-      Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Equal (Lexing.dummy_pos, Lexing.dummy_pos);
-      Integer (42L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      In (Lexing.dummy_pos, Lexing.dummy_pos);
-      If (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Greater (Lexing.dummy_pos, Lexing.dummy_pos);
-      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Then (Lexing.dummy_pos, Lexing.dummy_pos);
-      Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Else (Lexing.dummy_pos, Lexing.dummy_pos);
-      Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Integer (42L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.In (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.If (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Greater (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Then (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Else (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_many_identifiers ctxt =
@@ -214,7 +215,7 @@ let test_many_identifiers ctxt =
   in
   let expected =
     List.init 1000 (fun i ->
-        Token.Identifier
+        Parser.Identifier
           ("x" ^ string_of_int i, (Lexing.dummy_pos, Lexing.dummy_pos)))
   in
   assert_tokens ~ctxt input expected
