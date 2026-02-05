@@ -2,7 +2,7 @@ val string_buffer : Buffer.t
 (** A reusable buffer for accumulating characters when parsing string literals.
 *)
 
-val reserved : (string, Token.span -> Token.t) Hashtbl.t
+val reserved : (string, Lunno_common.Span.t -> Parser.token) Hashtbl.t
 (** A hashtable of reserved keywords and their corresponding token
     representations. *)
 
@@ -16,7 +16,7 @@ val strip_underscores : string -> string
     @param s The input string potentially containing underscores.
     @return A new string with all underscores removed. *)
 
-val with_pos : Lexing.lexbuf -> (Token.span -> 'a) -> 'a
+val with_pos : Lexing.lexbuf -> (Lunno_common.Span.t -> 'a) -> 'a
 (** [with_pos lexbuf ctor] constructs a token using the provided constructor
     [ctor] and the current lexeme's start and end positions from [lexbuf].
 
@@ -26,11 +26,11 @@ val with_pos : Lexing.lexbuf -> (Token.span -> 'a) -> 'a
 
     @param lexbuf The lexing buffer containing the input source code.
     @param ctor
-      A constructor function that takes a [Token.span] and returns a token of
-      type ['a].
+      A constructor function that takes a [Span.t] and returns a token of type
+      ['a].
     @return A token of type ['a] constructed with the current lexeme's span. *)
 
-val token : Lexing.lexbuf -> Token.t
+val token : Lexing.lexbuf -> Parser.token
 (** [token lexbuf] reads and returns the next token from the given lexing
     buffer.
 
@@ -39,12 +39,12 @@ val token : Lexing.lexbuf -> Token.t
     keywords. It advances the lexing cursor as it consumes characters.
 
     @param lexbuf The lexing buffer containing the input source code.
-    @return The next token of type [Token.token].
+    @return The next token of type [Parser.token].
     @raise Error.LexerError
       Raised if an invalid character, malformed number, or other lexical error
       is encountered. *)
 
-val read_string : Buffer.t -> Lexing.position -> Lexing.lexbuf -> Token.t
+val read_string : Buffer.t -> Lexing.position -> Lexing.lexbuf -> Parser.token
 (** [read_string buffer start_pos lexbuf] parses a string literal starting at
     the current lexing position.
 
@@ -62,7 +62,7 @@ val read_string : Buffer.t -> Lexing.position -> Lexing.lexbuf -> Token.t
       Raised if the string is empty, contains invalid escape sequences, includes
       a newline, or is unterminated. *)
 
-val read_comment : Lexing.lexbuf -> Token.t
+val read_comment : Lexing.lexbuf -> Parser.token
 (** [read_comment lexbuf] skips over a comment starting with '#' until the end
     of the line or EOF.
 

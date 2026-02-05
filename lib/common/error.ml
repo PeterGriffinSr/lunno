@@ -9,7 +9,7 @@ type error_code =
   | E_Lex_NewlineInString
   | E_Lex_EmptyString
 
-exception LexerError of { code : error_code; msg : string; span : Token.span }
+exception LexerError of { code : error_code; msg : string; span : Span.t }
 
 let string_of_code = function
   | E_Lex_UnexpectedChar -> "E1001"

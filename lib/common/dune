@@ -1,0 +1,3 @@
+(library
+ (name lunno_common)
+ (public_name lunno.common))

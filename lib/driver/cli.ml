@@ -1,3 +1,6 @@
+open Lunno_frontend
+open Lunno_common
+
 let read_file_lines filename =
   try
     let ic = open_in filename in
@@ -17,7 +20,7 @@ let read_file_lines filename =
 let lex lexbuf lines =
   let rec loop acc =
     match Lexer.token lexbuf with
-    | Token.EndOfFile _ -> List.rev acc
+    | Parser.EndOfFile _ -> List.rev acc
     | tok -> loop (tok :: acc)
   in
   try loop [] with
@@ -26,4 +29,15 @@ let lex lexbuf lines =
       exit 1
   | e ->
       Printf.eprintf "Unexpected lexing error: %s\n%!" (Printexc.to_string e);
+      exit 1
+
+let parse lexbuf lines =
+  try Parser.program Lexer.token lexbuf with
+  | Error.LexerError _ as e ->
+      Error.print_error lines e;
+      exit 1
+  | Parser.Error ->
+      let pos = lexbuf.Lexing.lex_curr_p in
+      Printf.eprintf "Parse error at line %d, char %d\n%!" pos.pos_lnum
+        (pos.pos_cnum - pos.pos_bol + 1);
       exit 1
