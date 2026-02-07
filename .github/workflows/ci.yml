@@ -3,6 +3,8 @@ name: Build
 on:
   push:
     branches: [main]
+    tags:
+      - "v*"
   pull_request:
 
 jobs:
@@ -49,15 +51,28 @@ jobs:
       - name: Build documentation
         run: opam exec -- dune build @doc
 
+      - name: Determine docs version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "version=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare versioned docs
+        run: |
+          mkdir -p public/${{ steps.version.outputs.version }}
+          cp -r _build/default/_doc/_html/* public/${{ steps.version.outputs.version }}/
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_build/default/_doc/_html
+          publish_dir: ./public
           publish_branch: gh-pages
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'Update OCaml documentation'
-          keep_files: false
-          force_orphan: true
+          keep_files: true
           enable_jekyll: false
