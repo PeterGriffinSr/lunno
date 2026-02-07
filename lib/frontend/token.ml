@@ -3,13 +3,14 @@ let to_string = function
   | Parser.FloatingPoint (f, _) -> Printf.sprintf "Float(%g)" f
   | Parser.String (s, _) -> Printf.sprintf "String(%S)" s
   | Parser.Identifier (id, _) -> Printf.sprintf "Identifier(%s)" id
+  | Parser.Boolean (b, _) -> Printf.sprintf "Boolean(%b)" b
+  | Parser.Unit ((), _) -> Printf.sprintf "Unit()"
   | Parser.Let _ -> "Let"
   | Parser.Function _ -> "Function"
   | Parser.If _ -> "If"
   | Parser.Then _ -> "Then"
   | Parser.Else _ -> "Else"
   | Parser.Match _ -> "Match"
-  | Parser.In _ -> "In"
   | Parser.IntegerType _ -> "IntegerType"
   | Parser.FloatingPointType _ -> "FloatingPointType"
   | Parser.StringType _ -> "StringType"

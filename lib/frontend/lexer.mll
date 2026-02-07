@@ -10,7 +10,6 @@
         "then", (fun span -> Then span);
         "else", (fun span -> Else span);
         "match", (fun span -> Match span);
-        "in", (fun span -> In span);
         "int", (fun span -> IntegerType span);
         "float", (fun span -> FloatingPointType span);
         "string", (fun span -> StringType span);

@@ -191,14 +191,13 @@ let test_unexpected_unicode ctxt =
   assert_lexer_error ~ctxt "🙂" E_Lex_UnexpectedChar
 
 let test_small_program ctxt =
-  let code = "let x = 42 in if x > 0 then x else 0" in
+  let code = "let x = 42 if x > 0 then x else 0" in
   assert_tokens ~ctxt code
     [
       Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
       Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Integer (42L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Parser.In (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.If (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
       Parser.Greater (Lexing.dummy_pos, Lexing.dummy_pos);
