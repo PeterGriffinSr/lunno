@@ -1,1 +1,7 @@
-(1 + 2) * 3
+function add(int[x, y]) -> int {
+    x + y
+}
+
+function sub(x: float, y: float) -> float {
+    x - y
+}

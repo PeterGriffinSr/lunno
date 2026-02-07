@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.2.1)
+(version 0.2.2)
 
 (generate_opam_files true)
 
@@ -24,6 +24,6 @@
  (synopsis "A purely functional programming language")
  (description
   "Lunno is a purely functional, statically typed programming language.")
- (depends ocaml dune ounit2)
+ (depends ocaml dune ounit2 menhir)
  (tags
   ("functional" "language" "typed" "static-typing")))
