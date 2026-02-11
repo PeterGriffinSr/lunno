@@ -68,6 +68,14 @@ rule token = parse
                     span = span;
                 }))
     }
+    | digits '_' ([^'0'-'9'] | eof) {
+        with_pos lexbuf (fun span ->
+            raise (LexerError {
+                code = E_Lex_InvalidInt;
+                msg = "Trailing underscore in integer literal";
+                span;
+            }))
+    }
     | int_literal as i {
         with_pos lexbuf (fun span ->
             try Integer (Int64.of_string (strip_underscores i), span)

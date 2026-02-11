@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.4.8] - 2026-02-10
+
+### Added
+- Unit test for span tracking validation.
+
+### Changed
+- Simplified lexer public API to expose only token entry point.
+
 ## [0.4.7] - 2026-02-07
 
 ### Fixed

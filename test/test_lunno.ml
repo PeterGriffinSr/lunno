@@ -127,8 +127,12 @@ let test_floats ctxt =
       Parser.FloatingPoint (1.2e-3, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
-let test_invalid_integer ctxt =
-  assert_lexer_error ~ctxt "999999999999999999999999999" E_Lex_InvalidInt
+let test_max_int64 ctxt =
+  assert_tokens ~ctxt "9223372036854775807"
+    [ Parser.Integer (Int64.max_int, (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+
+let test_overflow_int64 ctxt =
+  assert_lexer_error ~ctxt "9223372036854775808" E_Lex_InvalidInt
 
 let test_simple_string ctxt =
   assert_tokens ~ctxt "\"hello\""
@@ -190,6 +194,65 @@ let test_unexpected_char ctxt =
 let test_unexpected_unicode ctxt =
   assert_lexer_error ~ctxt "🙂" E_Lex_UnexpectedChar
 
+let test_invalid_integer_underscore ctxt =
+  assert_tokens ~ctxt "_123"
+    [ Parser.Identifier ("_123", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+
+let test_trailing_integer_underscore ctxt =
+  assert_lexer_error ~ctxt "123_" E_Lex_InvalidInt
+
+let test_arrow_vs_minus ctxt =
+  assert_tokens ~ctxt "-> - >"
+    [
+      Parser.Arrow (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Minus (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Greater (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
+
+let test_operator_chains ctxt =
+  assert_tokens ~ctxt "= =>"
+    [
+      Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Greater (Lexing.dummy_pos, Lexing.dummy_pos);
+    ]
+
+let test_identifier_leading_underscore ctxt =
+  assert_tokens ~ctxt "_foo"
+    [ Parser.Identifier ("_foo", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+
+let test_token_adjacency ctxt =
+  assert_tokens ~ctxt "x=1+2"
+    [
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Integer (1L, (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Plus (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.Integer (2L, (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
+
+let test_comment_eof ctxt =
+  assert_tokens ~ctxt "let # comment"
+    [ Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos) ]
+
+let test_comment_inline ctxt =
+  assert_tokens ~ctxt "x # hi\n y"
+    [
+      Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
+      Parser.Identifier ("y", (Lexing.dummy_pos, Lexing.dummy_pos));
+    ]
+
+let test_string_single_escape ctxt =
+  assert_tokens ~ctxt "\"\\\\\""
+    [ Parser.String ("\\", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+
+let test_string_escape_eof ctxt =
+  assert_lexer_error ~ctxt "\"abc\\" E_Lex_UnterminatedString
+
+let test_single_identifier_eof ctxt =
+  assert_tokens ~ctxt "hello"
+    [ Parser.Identifier ("hello", (Lexing.dummy_pos, Lexing.dummy_pos)) ]
+
 let test_small_program ctxt =
   let code = "let x = 42 if x > 0 then x else 0" in
   assert_tokens ~ctxt code
@@ -219,6 +282,14 @@ let test_many_identifiers ctxt =
   in
   assert_tokens ~ctxt input expected
 
+let test_span_tracking ctxt =
+  let lexbuf = Lexing.from_string "let x" in
+  match Lexer.token lexbuf with
+  | Parser.Let (start, stop) ->
+      assert_equal ~ctxt 0 start.pos_cnum;
+      assert_equal ~ctxt 3 stop.pos_cnum
+  | _ -> assert_failure "Expected Let token"
+
 let suite =
   "lunno lexer tests"
   >::: [
@@ -233,7 +304,8 @@ let suite =
          "integers" >:: test_integers;
          "integer underscores" >:: test_integer_underscores;
          "floats" >:: test_floats;
-         "invalid integer" >:: test_invalid_integer;
+         "max int64" >:: test_max_int64;
+         "overflow int64" >:: test_overflow_int64;
          "simple string" >:: test_simple_string;
          "complex strings" >:: test_complex_strings;
          "string escapes" >:: test_string_escapes;
@@ -249,6 +321,18 @@ let suite =
          "unexpected unicode" >:: test_unexpected_unicode;
          "small program" >:: test_small_program;
          "stress identifiers" >:: test_many_identifiers;
+         "invalid integer underscore" >:: test_invalid_integer_underscore;
+         "trailing integer underscore" >:: test_trailing_integer_underscore;
+         "arrow vs minus" >:: test_arrow_vs_minus;
+         "operator chains" >:: test_operator_chains;
+         "identifier leading underscore" >:: test_identifier_leading_underscore;
+         "token adjacency" >:: test_token_adjacency;
+         "comment eof" >:: test_comment_eof;
+         "comment inline" >:: test_comment_inline;
+         "string single escape" >:: test_string_single_escape;
+         "string escape eof" >:: test_string_escape_eof;
+         "single identifier eof" >:: test_single_identifier_eof;
+         "span tracking" >:: test_span_tracking;
        ]
 
 let () = run_test_tt_main suite
