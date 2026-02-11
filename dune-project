@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.4.7)
+(version 0.4.8)
 
 (generate_opam_files true)
 
