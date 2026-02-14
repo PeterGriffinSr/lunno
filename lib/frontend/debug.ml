@@ -47,12 +47,31 @@ let rec dump_expr ?(indent = 0) e =
       Printf.printf "%sUnary(%s) %s\n" pad (string_of_unop op)
         (string_of_span span);
       dump_expr ~indent:(indent + 2) expr
-  | Let { name; ty; body; span } ->
-      let ty_str =
-        match ty with None -> "Infer" | Some ty -> string_of_ty ty
-      in
-      Printf.printf "%sLet(%s : %s) %s\n" pad name ty_str (string_of_span span);
-      dump_expr ~indent:(indent + 2) body
+  | Let { name; ty; body; span } -> (
+      match body with
+      | Lambda { params; ret_ty; body = lambda_body; span = _ } ->
+          let params_str =
+            String.concat ", "
+              (List.map
+                 (fun (p : param) ->
+                   match p.ty with
+                   | None -> p.name
+                   | Some t -> Printf.sprintf "%s: %s" p.name (string_of_ty t))
+                 params)
+          in
+          let ret_str =
+            match ret_ty with None -> "Infer" | Some t -> string_of_ty t
+          in
+          Printf.printf "%sLetFn(%s(%s) -> %s) %s\n" pad name params_str ret_str
+            (string_of_span span);
+          dump_expr ~indent:(indent + 2) lambda_body
+      | _ ->
+          let ty_str =
+            match ty with None -> "Infer" | Some ty -> string_of_ty ty
+          in
+          Printf.printf "%sLet(%s : %s) %s\n" pad name ty_str
+            (string_of_span span);
+          dump_expr ~indent:(indent + 2) body)
   | Lambda { params; ret_ty = _; body; span } ->
       Printf.printf "%sLambda %s\n" pad (string_of_span span);
       List.iter

@@ -5,7 +5,6 @@
     let reserved = 
         Hashtbl.of_seq (List.to_seq [
         "let", (fun  span -> Let span);
-        "function", (fun span -> Function span);
         "if", (fun span -> If span);
         "then", (fun span -> Then span);
         "else", (fun span -> Else span);
@@ -58,6 +57,7 @@ rule token = parse
     | "," { with_pos lexbuf (fun span -> Comma span) }
     | ":" { with_pos lexbuf (fun span -> Colon span) }
     | "|" { with_pos lexbuf (fun span -> Pipe span) }
+    | ";" { with_pos lexbuf (fun span -> Semicolon span) }
     | float_literal as f {
         with_pos lexbuf (fun span ->
             try FloatingPoint (float_of_string (strip_underscores f), span)

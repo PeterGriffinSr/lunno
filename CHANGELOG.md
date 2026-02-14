@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.5.0] - 2026-02-13
+
+### Added
+- Unit tests for parser validation.
+- Function declaration syntax support.
+- Function call expression parsing.
+
+### Changed
+- Dune version from 3.20 to 3.21.
+- Dune progject tags and configuration.
+- Debug output format for `let` binding expression.
+
+### Removed
+- `function` keyword.
+
 ## [0.4.8] - 2026-02-10
 
 ### Added

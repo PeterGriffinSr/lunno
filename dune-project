@@ -1,4 +1,4 @@
-(lang dune 3.20)
+(lang dune 3.21)
 
 (using menhir 3.0)
 
@@ -26,4 +26,4 @@
   "Lunno is a purely functional, statically typed programming language.")
  (depends ocaml dune ounit2 menhir)
  (tags
-  ("functional" "language" "typed" "static-typing")))
+  ("functional" "language" "compiler" "typed" "static-typing")))

@@ -6,7 +6,6 @@ let to_string = function
   | Parser.Boolean (b, _) -> Printf.sprintf "Boolean(%b)" b
   | Parser.Unit ((), _) -> Printf.sprintf "Unit()"
   | Parser.Let _ -> "Let"
-  | Parser.Function _ -> "Function"
   | Parser.If _ -> "If"
   | Parser.Then _ -> "Then"
   | Parser.Else _ -> "Else"
@@ -35,4 +34,5 @@ let to_string = function
   | Parser.Pipe _ -> "Pipe"
   | Parser.Cons _ -> "Cons"
   | Parser.Arrow _ -> "Arrow"
+  | Parser.Semicolon _ -> "Semicolon"
   | Parser.EndOfFile _ -> "EOF"
