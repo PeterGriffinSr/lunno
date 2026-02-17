@@ -10,14 +10,17 @@ type ty =
   | TyList of ty
   | TyFunction of ty list * ty
 
+type literal =
+  | LInt of int64
+  | LFloat of float
+  | LString of string
+  | LBool of bool
+  | LUnit
+
 type param = { name : string; ty : ty option; span : Span.t }
 
 type expr =
-  | IntLiteral of int64 * Span.t
-  | FloatLiteral of float * Span.t
-  | StringLiteral of string * Span.t
-  | BooleanLiteral of bool * Span.t
-  | UnitLiteral of Span.t
+  | Literal of literal * Span.t
   | Variable of string * Span.t
   | Lambda of lambda
   | Apply of expr * expr list * Span.t
@@ -32,11 +35,12 @@ and lambda = {
   params : param list;
   ret_ty : ty option;
   body : expr;
+  is_recursive : bool;
   span : Span.t;
 }
 
 and let_expr = { name : string; ty : ty option; body : expr; span : Span.t }
-and if_expr = { cond : expr; then_ : expr; else_ : expr; span : Span.t }
+and if_expr = { cond : expr; then_ : expr; else_ : expr option; span : Span.t }
 and match_expr = { scrutinee : expr; cases : match_case list; span : Span.t }
 
 and match_case = {

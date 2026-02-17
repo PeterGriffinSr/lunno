@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.5.1] - 2026-02-15
+
+### Added
+- Recursive flag support for lambda expressions.
+- `if` and `match` expression syntax.
+- Unit tests for `if` and `match` expression validation.
+- Dune package lock file for reproducible builds.
+
+### Changed
+- AST literal node references.
+- Unit tests for lexer and parser validation.
+- Debug output format for `let` binding expressions.
+- README
+
 ## [0.5.0] - 2026-02-13
 
 ### Added

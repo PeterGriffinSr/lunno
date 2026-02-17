@@ -34,5 +34,5 @@ let to_string = function
   | Parser.Pipe _ -> "Pipe"
   | Parser.Cons _ -> "Cons"
   | Parser.Arrow _ -> "Arrow"
-  | Parser.Semicolon _ -> "Semicolon"
+  | Parser.Underscore _ -> "Underscore"
   | Parser.EndOfFile _ -> "EOF"

@@ -1,1 +1,9 @@
-let~x = 5
+let fib(n: int) -> int {
+    let fib_aux(int[m, a, b]) -> int {
+        match m {
+            | 0 -> a
+            | _ -> fib_aux(m - 1, b, a + b)
+        }
+    }
+    fib_aux(n, 0, 1)
+}

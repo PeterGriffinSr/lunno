@@ -27,15 +27,13 @@ let string_of_span (start_pos, end_pos) =
 let rec dump_expr ?(indent = 0) e =
   let pad = String.make indent ' ' in
   match e with
-  | IntLiteral (i, sp) ->
-      Printf.printf "%sInt(%Ld) %s\n" pad i (string_of_span sp)
-  | FloatLiteral (f, sp) ->
-      Printf.printf "%sFloat(%g) %s\n" pad f (string_of_span sp)
-  | StringLiteral (s, sp) ->
-      Printf.printf "%sString(%S) %s\n" pad s (string_of_span sp)
-  | BooleanLiteral (b, sp) ->
-      Printf.printf "%sBool(%b) %s\n" pad b (string_of_span sp)
-  | UnitLiteral sp -> Printf.printf "%sUnit %s\n" pad (string_of_span sp)
+  | Literal (lit, sp) -> (
+      match lit with
+      | LInt i -> Printf.printf "%sInt(%Ld) %s\n" pad i (string_of_span sp)
+      | LFloat f -> Printf.printf "%sFloat(%g) %s\n" pad f (string_of_span sp)
+      | LString s -> Printf.printf "%sString(%S) %s\n" pad s (string_of_span sp)
+      | LBool b -> Printf.printf "%sBool(%b) %s\n" pad b (string_of_span sp)
+      | LUnit -> Printf.printf "%sUnit %s\n" pad (string_of_span sp))
   | Variable (name, sp) ->
       Printf.printf "%sVar(%s) %s\n" pad name (string_of_span sp)
   | Binary { op; left; right; span } ->
@@ -47,46 +45,44 @@ let rec dump_expr ?(indent = 0) e =
       Printf.printf "%sUnary(%s) %s\n" pad (string_of_unop op)
         (string_of_span span);
       dump_expr ~indent:(indent + 2) expr
-  | Let { name; ty; body; span } -> (
-      match body with
-      | Lambda { params; ret_ty; body = lambda_body; span = _ } ->
-          let params_str =
-            String.concat ", "
-              (List.map
-                 (fun (p : param) ->
-                   match p.ty with
-                   | None -> p.name
-                   | Some t -> Printf.sprintf "%s: %s" p.name (string_of_ty t))
-                 params)
-          in
-          let ret_str =
-            match ret_ty with None -> "Infer" | Some t -> string_of_ty t
-          in
-          Printf.printf "%sLetFn(%s(%s) -> %s) %s\n" pad name params_str ret_str
-            (string_of_span span);
-          dump_expr ~indent:(indent + 2) lambda_body
-      | _ ->
-          let ty_str =
-            match ty with None -> "Infer" | Some ty -> string_of_ty ty
-          in
-          Printf.printf "%sLet(%s : %s) %s\n" pad name ty_str
-            (string_of_span span);
-          dump_expr ~indent:(indent + 2) body)
-  | Lambda { params; ret_ty = _; body; span } ->
-      Printf.printf "%sLambda %s\n" pad (string_of_span span);
-      List.iter
-        (fun (p : param) ->
-          let ty_str =
-            match p.ty with None -> "Infer" | Some t -> string_of_ty t
-          in
-          Printf.printf "%s  Param(%s : %s)\n" pad p.name ty_str)
-        params;
+  | Let { name; ty; body; span } ->
+      let ty_str = get_let_type_string ty body in
+      Printf.printf "%sLet(%s : %s) %s\n" pad name ty_str (string_of_span span);
       dump_expr ~indent:(indent + 2) body
-  | If { cond; then_; else_; span } ->
+  | Lambda { params; ret_ty; body; is_recursive; span } ->
+      let params_str =
+        String.concat ", "
+          (List.map
+             (fun (p : param) ->
+               match p.ty with
+               | None -> p.name
+               | Some t -> Printf.sprintf "%s: %s" p.name (string_of_ty t))
+             params)
+      in
+      let ret_str =
+        match ret_ty with None -> "Infer" | Some t -> string_of_ty t
+      in
+      let rec_str = if is_recursive then " [recursive]" else "" in
+      (match (params, ret_ty) with
+      | [], None ->
+          Printf.printf "%sLambda%s %s\n" pad rec_str (string_of_span span)
+      | [], Some _ ->
+          Printf.printf "%sLambda(-> %s)%s %s\n" pad ret_str rec_str
+            (string_of_span span)
+      | _, _ ->
+          Printf.printf "%sLambda(%s -> %s)%s %s\n" pad params_str ret_str
+            rec_str (string_of_span span));
+      dump_expr ~indent:(indent + 2) body
+  | If { cond; then_; else_; span } -> (
       Printf.printf "%sIf %s\n" pad (string_of_span span);
       dump_expr ~indent:(indent + 2) cond;
-      dump_expr ~indent:(indent + 2) then_;
-      dump_expr ~indent:(indent + 2) else_
+      Printf.printf "%sThen:\n" (String.make (indent + 2) ' ');
+      dump_expr ~indent:(indent + 4) then_;
+      match else_ with
+      | Some e ->
+          Printf.printf "%sElse:\n" (String.make (indent + 2) ' ');
+          dump_expr ~indent:(indent + 4) e
+      | None -> ())
   | Match { scrutinee; cases; span } ->
       Printf.printf "%sMatch %s\n" pad (string_of_span span);
       dump_expr ~indent:(indent + 2) scrutinee;
@@ -102,10 +98,26 @@ let rec dump_expr ?(indent = 0) e =
   | Block (exprs, span) ->
       Printf.printf "%sBlock %s\n" pad (string_of_span span);
       List.iter (dump_expr ~indent:(indent + 2)) exprs
-  | Apply (f, args, span) ->
-      Printf.printf "%sApply %s\n" pad (string_of_span span);
-      dump_expr ~indent:(indent + 2) f;
-      List.iter (dump_expr ~indent:(indent + 2)) args
+  | Apply (f, args, span) -> (
+      match f with
+      | Variable (name, _) ->
+          Printf.printf "%sApply(%s) with %d arg(s) %s\n" pad name
+            (List.length args) (string_of_span span);
+          List.iteri
+            (fun i arg ->
+              Printf.printf "%s  [%d]:\n" pad i;
+              dump_expr ~indent:(indent + 4) arg)
+            args
+      | _ ->
+          Printf.printf "%sApply %s\n" pad (string_of_span span);
+          Printf.printf "%s  Function:\n" pad;
+          dump_expr ~indent:(indent + 4) f;
+          Printf.printf "%s  Arguments (%d):\n" pad (List.length args);
+          List.iteri
+            (fun i arg ->
+              Printf.printf "%s    [%d]:\n" pad i;
+              dump_expr ~indent:(indent + 6) arg)
+            args)
 
 and dump_pattern ?(indent = 0) = function
   | PWildcard sp ->
@@ -147,5 +159,29 @@ and string_of_ty = function
       Printf.sprintf "Fun(%s -> %s)"
         (String.concat ", " (List.map string_of_ty args))
         (string_of_ty ret)
+
+and get_let_type_string ty body =
+  match ty with
+  | Some t -> string_of_ty t
+  | None -> (
+      match body with
+      | Lambda lambda ->
+          let params_str =
+            String.concat ", "
+              (List.map
+                 (fun (p : param) ->
+                   match p.ty with
+                   | Some t -> Printf.sprintf "%s: %s" p.name (string_of_ty t)
+                   | None -> Printf.sprintf "%s: Infer" p.name)
+                 lambda.params)
+          in
+          let ret_str =
+            match lambda.ret_ty with
+            | Some t -> string_of_ty t
+            | None -> "Infer"
+          in
+          if lambda.params = [] then ret_str
+          else Printf.sprintf "Fun(%s -> %s)" params_str ret_str
+      | _ -> "Infer")
 
 let dump_program prog = List.iter (dump_expr ~indent:0) prog

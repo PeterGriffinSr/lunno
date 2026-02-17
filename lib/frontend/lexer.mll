@@ -14,6 +14,8 @@
         "string", (fun span -> StringType span);
         "bool", (fun span -> BooleanType span);
         "unit", (fun span -> UnitType span);
+        "true", (fun span -> Boolean (true, span));
+        "false", (fun span -> Boolean (false, span));
     ])
     let strip_underscores s = 
         let buffer = Buffer.create (String.length s) in
@@ -57,7 +59,7 @@ rule token = parse
     | "," { with_pos lexbuf (fun span -> Comma span) }
     | ":" { with_pos lexbuf (fun span -> Colon span) }
     | "|" { with_pos lexbuf (fun span -> Pipe span) }
-    | ";" { with_pos lexbuf (fun span -> Semicolon span) }
+    | "_" { with_pos lexbuf (fun span -> Underscore span) }
     | float_literal as f {
         with_pos lexbuf (fun span ->
             try FloatingPoint (float_of_string (strip_underscores f), span)

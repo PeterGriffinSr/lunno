@@ -9,6 +9,13 @@ type ty =
   | TyList of ty  (** List type, e.g., [int]. *)
   | TyFunction of ty list * ty  (** Function type, e.g., (int, int) -> int. *)
 
+type literal =
+  | LInt of int64
+  | LFloat of float
+  | LString of string
+  | LBool of bool
+  | LUnit
+
 type param = {
   name : string;  (** Parameter name. *)
   ty : ty option;  (** Optional type annotation. *)
@@ -18,11 +25,7 @@ type param = {
 
 (** The [expr] type represents all expressions in the language. *)
 type expr =
-  | IntLiteral of int64 * Lunno_common.Span.t  (** Integer literal. *)
-  | FloatLiteral of float * Lunno_common.Span.t  (** Floating-point literal. *)
-  | StringLiteral of string * Lunno_common.Span.t  (** String literal. *)
-  | BooleanLiteral of bool * Lunno_common.Span.t  (** Boolean literal. *)
-  | UnitLiteral of Lunno_common.Span.t  (** Unit literal. *)
+  | Literal of literal * Lunno_common.Span.t  (** Literal reference.*)
   | Variable of string * Lunno_common.Span.t  (** Variable reference. *)
   | Lambda of lambda  (** Lambda / anonymous function. *)
   | Apply of expr * expr list * Lunno_common.Span.t
@@ -38,6 +41,7 @@ and lambda = {
   params : param list;  (** Parameters. *)
   ret_ty : ty option;  (** Optional return type annotation. *)
   body : expr;  (** Function body. *)
+  is_recursive : bool;
   span : Lunno_common.Span.t;  (** Span of the whole lambda. *)
 }
 (** The [lambda] type represents anonymous functions. *)
@@ -53,7 +57,7 @@ and let_expr = {
 and if_expr = {
   cond : expr;  (** Condition expression. *)
   then_ : expr;  (** Then branch. *)
-  else_ : expr;  (** Else branch. *)
+  else_ : expr option;  (** Else branch. *)
   span : Lunno_common.Span.t;  (** Span of the if expression. *)
 }
 (** The [if_expr] type represents if expressions. *)
