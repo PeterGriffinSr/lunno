@@ -2,6 +2,17 @@
 
 (pkg enabled)
 
-(context
- (default
-  (name default)))
+(lock_dir
+ (solve_for_platforms
+  ((arch x86_64)
+   (os linux))
+  ((arch arm64)
+   (os linux))
+  ((arch x86_64)
+   (os macos))
+  ((arch arm64)
+   (os macos))
+  ((arch x86_64)
+   (os win32))
+  ((arch amd64)
+   (os win32))))

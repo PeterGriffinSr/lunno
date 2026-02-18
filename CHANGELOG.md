@@ -11,7 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
-## [0.5.1] - 2026-02-15
+## [0.5.2] - 2026-02-17
+
+### Fixed
+- Corrected dune-workspace configuration for cross-platform CI builds.
+- Fixed Windows build failures by switching to Dune package management.
+
+### Changed
+- Migrated CI workflow from opam-based dependency installation to Dune package management.
+- Simplified dune-workspace by removing explicit context definitions.
+
+## [0.5.1] - 2026-02-17
 
 ### Added
 - Recursive flag support for lambda expressions.

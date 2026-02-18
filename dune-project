@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.5.1)
+(version 0.5.2)
 
 (source
  (github PeterGriffinSr/lunno))

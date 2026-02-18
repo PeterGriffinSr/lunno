@@ -26,7 +26,7 @@ jobs:
           ocaml-compiler: 5
 
       - name: Install dependencies
-        run: opam install dune ounit2 menhir
+        run: opam install dune
 
       - name: Run tests
         run: opam exec -- dune test
