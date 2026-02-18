@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.5.3] - 2026-02-18
+
+### Fixed
+- Fixed Windows build failures.
+
 ## [0.5.2] - 2026-02-17
 
 ### Fixed
