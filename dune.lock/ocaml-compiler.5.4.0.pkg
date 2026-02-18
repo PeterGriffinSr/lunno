@@ -540,10 +540,7 @@
          LIBS=-static)
         --disable-warn-error)
        (run %{make} -j%{jobs}))))))
-  ((((arch x86_64)
-     (os win32))
-    ((arch amd64)
-     (os win32)))
+  ((((arch x86_64) (os windows)))
    ((action
      (withenv
       ((= MSYS2_ARG_CONV_EXCL *)
@@ -584,11 +581,6 @@
          --host=i686-w64-mingw32)
         --prefix=%{prefix}
         --docdir=%{doc}/ocaml
-        (when
-         (catch_undefined_var
-          (and_absorb_undefined_var true %{pkg:flexdll:installed})
-          false)
-         --with-flexdll=%{pkg:flexdll:share})
         (when
          (catch_undefined_var %{pkg:system-msvc:installed} false)
          --with-winpthreads-msvc=%{pkg:winpthreads:share})
@@ -665,24 +657,6 @@
          LIBS=-static)
         --disable-warn-error)
        (run %{make} -j%{jobs}))))))))
-
-(depends
- (choice
-  ((((arch x86_64)
-     (os linux))
-    ((arch arm64)
-     (os linux))
-    ((arch x86_64)
-     (os macos))
-    ((arch arm64)
-     (os macos)))
-   ())
-  ((((arch x86_64)
-     (os win32)))
-   (arch-x86_64 system-mingw flexdll))
-  ((((arch amd64)
-     (os win32)))
-   (system-mingw ocaml-option-bytecode-only flexdll))))
 
 (source
  (fetch

@@ -11,6 +11,4 @@
   ((arch arm64)
    (os macos))
   ((arch x86_64)
-   (os win32))
-  ((arch amd64)
-   (os win32))))
+   (os windows))))
