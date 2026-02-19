@@ -1,10 +1,9 @@
 open Lunno
 
 let () =
-  match Array.to_list Sys.argv with
-  | [ _; filename ] ->
+  let flags = Flags.parse Sys.argv in
+  List.iter
+    (fun filename ->
       let prog = parse_file filename in
-      Debug.dump_program prog
-  | _ ->
-      Printf.eprintf "Usage: %s <filename>\n%!" Sys.argv.(0);
-      exit 1
+      if flags.dump_program then Debug.dump_program prog)
+    flags.files

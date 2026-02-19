@@ -1,4 +1,5 @@
 module Debug = Lunno_frontend.Debug
+module Flags = Lunno_driver.Flags
 
 let parse_string source =
   let lexbuf = Lexing.from_string source in

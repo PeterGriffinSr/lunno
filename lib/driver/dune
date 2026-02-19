@@ -2,3 +2,8 @@
  (name lunno_driver)
  (public_name lunno.driver)
  (libraries lunno.frontend lunno.common))
+
+(rule
+ (target version.ml)
+ (action
+  (write-file %{target} "let version = \"%{version:lunno}\"")))

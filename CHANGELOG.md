@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.5.5] - 2026-02-18
+
+### Added
+- Added `--dump-program` flag to print the AST and exit.
+- Added `--version` flag to print the current version and exit.
+- Added `--help` flag with formatted usage output.
+- CLI now supports multiple input files.
+
 ## [0.5.4] - 2026-02-18
 
 ### Fixed

@@ -1,4 +1,5 @@
 module Debug = Lunno_frontend.Debug
+module Flags = Lunno_driver.Flags
 
 val parse_string : string -> Lunno_frontend.Ast.program
 (** [parse_string s] parses the input string [s] and returns the resulting AST
