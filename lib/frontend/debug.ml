@@ -3,7 +3,20 @@ open Ast
 let rec dump_tokens lexbuf =
   let token = Lexer.token lexbuf in
   Printf.printf "%s\n" (Token.to_string token);
-  match token with Parser.EndOfFile _ -> () | _ -> dump_tokens lexbuf
+  match token with
+  | Parser.EndOfFile _ -> ()
+  | Parser.Integer _ | Parser.FloatingPoint _ | Parser.Identifier _
+  | Parser.String _ | Parser.Boolean _ | Parser.Unit _ | Parser.KwLet _
+  | Parser.KwIf _ | Parser.KwThen _ | Parser.KwElse _ | Parser.KwMatch _
+  | Parser.IntegerType _ | Parser.FloatingPointType _ | Parser.StringType _
+  | Parser.BooleanType _ | Parser.UnitType _ | Parser.LeftParen _
+  | Parser.RightParen _ | Parser.LeftBrace _ | Parser.RightBrace _
+  | Parser.LeftBracket _ | Parser.RightBracket _ | Parser.Plus _
+  | Parser.Minus _ | Parser.Asterisk _ | Parser.Slash _ | Parser.Equal _
+  | Parser.NotEqual _ | Parser.Less _ | Parser.Greater _ | Parser.Comma _
+  | Parser.Colon _ | Parser.Pipe _ | Parser.Cons _ | Parser.Arrow _
+  | Parser.Underscore _ ->
+      dump_tokens lexbuf
 
 let string_of_binop = function
   | OpAdd -> "+"
@@ -36,27 +49,29 @@ let rec dump_expr ?(indent = 0) e =
       | LUnit -> Printf.printf "%sUnit %s\n" pad (string_of_span sp))
   | Variable (name, sp) ->
       Printf.printf "%sVar(%s) %s\n" pad name (string_of_span sp)
-  | Binary { op; left; right; span } ->
-      Printf.printf "%sBinary(%s) %s\n" pad (string_of_binop op)
-        (string_of_span span);
+  | Binary { binary_op; left; right; binary_span } ->
+      Printf.printf "%sBinary(%s) %s\n" pad
+        (string_of_binop binary_op)
+        (string_of_span binary_span);
       dump_expr ~indent:(indent + 2) left;
       dump_expr ~indent:(indent + 2) right
-  | Unary { op; expr; span } ->
-      Printf.printf "%sUnary(%s) %s\n" pad (string_of_unop op)
-        (string_of_span span);
+  | Unary { unary_op; expr; unary_span } ->
+      Printf.printf "%sUnary(%s) %s\n" pad (string_of_unop unary_op)
+        (string_of_span unary_span);
       dump_expr ~indent:(indent + 2) expr
-  | Let { name; ty; body; span } ->
-      let ty_str = get_let_type_string ty body in
-      Printf.printf "%sLet(%s : %s) %s\n" pad name ty_str (string_of_span span);
-      dump_expr ~indent:(indent + 2) body
-  | Lambda { params; ret_ty; body; is_recursive; span } ->
+  | Let { name; ty; let_body; let_span } ->
+      let ty_str = get_let_type_string ty let_body in
+      Printf.printf "%sLet(%s : %s) %s\n" pad name ty_str
+        (string_of_span let_span);
+      dump_expr ~indent:(indent + 2) let_body
+  | Lambda { params; ret_ty; lambda_body; is_recursive; lambda_span } ->
       let params_str =
         String.concat ", "
           (List.map
              (fun (p : param) ->
-               match p.ty with
-               | None -> p.name
-               | Some t -> Printf.sprintf "%s: %s" p.name (string_of_ty t))
+               match p.param_ty with
+               | None -> p.param_name
+               | Some t -> Printf.sprintf "%s: %s" p.param_name (string_of_ty t))
              params)
       in
       let ret_str =
@@ -65,16 +80,18 @@ let rec dump_expr ?(indent = 0) e =
       let rec_str = if is_recursive then " [recursive]" else "" in
       (match (params, ret_ty) with
       | [], None ->
-          Printf.printf "%sLambda%s %s\n" pad rec_str (string_of_span span)
+          Printf.printf "%sLambda%s %s\n" pad rec_str
+            (string_of_span lambda_span)
       | [], Some _ ->
           Printf.printf "%sLambda(-> %s)%s %s\n" pad ret_str rec_str
-            (string_of_span span)
+            (string_of_span lambda_span)
       | _, _ ->
           Printf.printf "%sLambda(%s -> %s)%s %s\n" pad params_str ret_str
-            rec_str (string_of_span span));
-      dump_expr ~indent:(indent + 2) body
-  | If { cond; then_; else_; span } -> (
-      Printf.printf "%sIf %s\n" pad (string_of_span span);
+            rec_str
+            (string_of_span lambda_span));
+      dump_expr ~indent:(indent + 2) lambda_body
+  | If { cond; then_; else_; if_span } -> (
+      Printf.printf "%sIf %s\n" pad (string_of_span if_span);
       dump_expr ~indent:(indent + 2) cond;
       Printf.printf "%sThen:\n" (String.make (indent + 2) ' ');
       dump_expr ~indent:(indent + 4) then_;
@@ -83,8 +100,8 @@ let rec dump_expr ?(indent = 0) e =
           Printf.printf "%sElse:\n" (String.make (indent + 2) ' ');
           dump_expr ~indent:(indent + 4) e
       | None -> ())
-  | Match { scrutinee; cases; span } ->
-      Printf.printf "%sMatch %s\n" pad (string_of_span span);
+  | Match { scrutinee; cases; match_span } ->
+      Printf.printf "%sMatch %s\n" pad (string_of_span match_span);
       dump_expr ~indent:(indent + 2) scrutinee;
       List.iter
         (fun c ->
@@ -93,7 +110,7 @@ let rec dump_expr ?(indent = 0) e =
           (match c.guard with
           | Some g -> dump_expr ~indent:(indent + 4) g
           | None -> ());
-          dump_expr ~indent:(indent + 4) c.body)
+          dump_expr ~indent:(indent + 4) c.case_body)
         cases
   | Block (exprs, span) ->
       Printf.printf "%sBlock %s\n" pad (string_of_span span);
@@ -108,7 +125,8 @@ let rec dump_expr ?(indent = 0) e =
               Printf.printf "%s  [%d]:\n" pad i;
               dump_expr ~indent:(indent + 4) arg)
             args
-      | _ ->
+      | Lambda _ | Apply _ | Let _ | If _ | Match _ | Block _ | Binary _
+      | Unary _ | Literal _ ->
           Printf.printf "%sApply %s\n" pad (string_of_span span);
           Printf.printf "%s  Function:\n" pad;
           dump_expr ~indent:(indent + 4) f;
@@ -170,9 +188,10 @@ and get_let_type_string ty body =
             String.concat ", "
               (List.map
                  (fun (p : param) ->
-                   match p.ty with
-                   | Some t -> Printf.sprintf "%s: %s" p.name (string_of_ty t)
-                   | None -> Printf.sprintf "%s: Infer" p.name)
+                   match p.param_ty with
+                   | Some t ->
+                       Printf.sprintf "%s: %s" p.param_name (string_of_ty t)
+                   | None -> Printf.sprintf "%s: Infer" p.param_name)
                  lambda.params)
           in
           let ret_str =
@@ -182,6 +201,14 @@ and get_let_type_string ty body =
           in
           if lambda.params = [] then ret_str
           else Printf.sprintf "Fun(%s -> %s)" params_str ret_str
-      | _ -> "Infer")
+      | Literal _ | Variable _ | Apply _ | Let _ | If _ | Match _ | Block _
+      | Binary _ | Unary _ ->
+          "Infer")
 
-let dump_program prog = List.iter (dump_expr ~indent:0) prog
+let dump_import imp =
+  Printf.printf "Import(\"%s:%s\") %s\n" imp.module_ imp.item
+    (string_of_span imp.import_span)
+
+let dump_program prog =
+  List.iter dump_import prog.imports;
+  List.iter (dump_expr ~indent:0) prog.body

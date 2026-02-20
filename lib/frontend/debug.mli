@@ -17,3 +17,10 @@ val dump_program : Ast.program -> unit
 
     @param prog The AST program to dump.
     @return Unit. *)
+
+val string_of_ty : Ast.ty -> string
+(** [string_of_ty ty] returns a human-readable string representation of the type
+    [ty].
+
+    @param ty The AST type to convert.
+    @return A string representing the given type. *)

@@ -1,14 +1,1 @@
 (lang dune 3.21)
-
-(lock_dir
- (solve_for_platforms
-  ((arch x86_64)
-   (os linux))
-  ((arch arm64)
-   (os linux))
-  ((arch x86_64)
-   (os macos))
-  ((arch arm64)
-   (os macos))
-  ((arch x86_64)
-   (os win32))))

@@ -4,7 +4,9 @@
 
 (name lunno)
 
-(version 0.5.5)
+(version 0.6.0)
+
+(generate_opam_files true)
 
 (source
  (github PeterGriffinSr/lunno))
@@ -24,7 +26,9 @@
   "Lunno is a purely functional, statically typed programming language.")
  (depends
   (ocaml
-   (>= 5.0.0))
+   (and
+    (>= 5.0.0)
+    (< 5.5.0)))
   (dune
    (>= 3.21))
   (menhir
@@ -32,6 +36,9 @@
   (ounit2
    (and
     :with-test
-    (>= 2.2.2.7))))
+    (= 2.2.2.7))))
+ (depopts
+  (merlin :dev)
+  (ocaml-lsp-server :dev))
  (tags
-  (functional language compiler typed static-typing)))
+  (lunno functional language compiler typed static-typing)))

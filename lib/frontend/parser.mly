@@ -5,10 +5,10 @@
         match expr with
         | Literal _ -> false
         | Variable (v, _) -> v = name
-        | Lambda { body; _ } -> contains_variable name body
+        | Lambda { lambda_body; _ } -> contains_variable name lambda_body
         | Apply (f, args, _) ->
             contains_variable name f || List.exists (contains_variable name) args
-        | Let { body; _ } -> contains_variable name body
+        | Let { let_body; _ } -> contains_variable name let_body
         | If { cond; then_; else_; _ } ->
             contains_variable name cond || 
             contains_variable name then_ || 
@@ -17,8 +17,8 @@
             | None -> false)
         | Match { scrutinee; cases; _ } ->
             contains_variable name scrutinee ||
-            List.exists (fun { body; guard; _ } ->
-                contains_variable name body ||
+            List.exists (fun { case_body; guard; _ } ->
+                contains_variable name case_body ||
                 (match guard with Some g -> contains_variable name g | None -> false)
             ) cases
         | Block (exprs, _) -> List.exists (contains_variable name) exprs
@@ -32,14 +32,14 @@
                 begin match e with
                     | Literal (_, sp) -> sp
                     | Variable (_, sp) -> sp
-                    | Binary { span; _ } -> span
-                    | Let { span; _ } -> span
-                    | Lambda { span; _ } -> span
+                    | Binary { binary_span; _ } -> binary_span
+                    | Let { let_span; _ } -> let_span
+                    | Lambda { lambda_span; _ } -> lambda_span
                     | Block (_, span) -> span
                     | Apply (_, _, span) -> span
-                    | If { span; _ } -> span
-                    | Match { span; _ } -> span
-                    | Unary { span; _ } -> span
+                    | If { if_span; _ } -> if_span
+                    | Match { match_span; _ } -> match_span
+                    | Unary { unary_span; _ } -> unary_span
                 end
             | `Span sp -> sp
             | `Pattern p ->
@@ -66,7 +66,7 @@
 %token <bool * Lunno_common.Span.t> Boolean
 %token <unit * Lunno_common.Span.t> Unit
 
-%token <Lunno_common.Span.t> Let If Then Else Match
+%token <Lunno_common.Span.t> KwLet KwIf KwThen KwElse KwMatch KwImport
 %token <Lunno_common.Span.t> IntegerType FloatingPointType StringType BooleanType UnitType
 %token <Lunno_common.Span.t> LeftParen RightParen LeftBrace RightBrace LeftBracket RightBracket
 %token <Lunno_common.Span.t> Plus Minus Asterisk Slash Equal NotEqual Less Greater
@@ -74,20 +74,39 @@
 %token <Lunno_common.Span.t> EndOfFile
 
 %nonassoc THEN
-%nonassoc Else
+%nonassoc KwElse
+
+%on_error_reduce call_expr
 
 %start program
 %type <Ast.program> program
-%type <Ast.ty> type_expr type_primary
-%type <Ast.ty list> type_expr_list
+%type <Ast.ty> type_expr type_primary ret_type ret_type_primary param_type
+%type <Ast.ty list> type_expr_list ret_type_list
 %type <Ast.pattern> pattern cons_pattern primary_pattern
 %type <Ast.match_case> match_case
 %type <Ast.match_case list> match_cases
+%type <Ast.import> import
+%type <Ast.import list> import_list
 
 %%
 
 program:
-    | expr_list EndOfFile { $1 }
+    | import_list expr_list EndOfFile { { imports = $1; body = $2 } }
+    | import_list EndOfFile { { imports = $1; body = [] } }
+    | expr_list EndOfFile { { imports = []; body = $1 } }
+    | EndOfFile { { imports = []; body = [] } }
+
+import_list:
+    | import import_list { $1 :: $2 }
+    | import { [$1] }
+
+import:
+    | KwImport String {
+        let (path, span) = $2 in
+        match String.split_on_char ':' path with
+        | [module_; item] ->
+            { module_; item; import_span = merge (`Span $1) (`Span span) }
+    }
 
 expr_list:
     | expr expr_list { $1 :: $2 }
@@ -100,20 +119,24 @@ expr:
     | comparison_expr { $1 }
 
 comparison_expr:
-    | comparison_expr Equal additive_expr { Binary { op = OpEqual; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
-    | comparison_expr NotEqual additive_expr { Binary { op = OpNotEqual; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
-    | comparison_expr Less additive_expr { Binary { op = OpLess; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
-    | comparison_expr Greater additive_expr { Binary { op = OpGreater; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr Equal additive_expr { Binary { binary_op = OpEqual;    left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr NotEqual additive_expr { Binary { binary_op = OpNotEqual; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr Less additive_expr { Binary { binary_op = OpLess;     left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr Greater additive_expr { Binary { binary_op = OpGreater;  left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | cons_expr { $1 }
+
+cons_expr:
+    | additive_expr Cons cons_expr { Binary { binary_op = OpCons; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
     | additive_expr { $1 }
 
 additive_expr:
-    | additive_expr Plus multiplicative_expr { Binary { op = OpAdd; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
-    | additive_expr Minus multiplicative_expr { Binary { op = OpSub; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
+    | additive_expr Plus multiplicative_expr { Binary { binary_op = OpAdd; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | additive_expr Minus multiplicative_expr { Binary { binary_op = OpSub; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
     | multiplicative_expr { $1 }
 
 multiplicative_expr:
-    | multiplicative_expr Asterisk primary_expr { Binary { op = OpMul; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
-    | multiplicative_expr Slash primary_expr { Binary { op = OpDiv; left = $1; right = $3; span = merge (`Expr $1) (`Expr $3) } }
+    | multiplicative_expr Asterisk primary_expr { Binary { binary_op = OpMul; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | multiplicative_expr Slash primary_expr { Binary { binary_op = OpDiv; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
     | call_expr { $1 }
 
 call_expr:
@@ -128,26 +151,27 @@ primary_expr:
     | Boolean { let (b, span) = $1 in Literal (LBool b, span) }
     | Unit { let ((), span) = $1 in Literal (LUnit, span) }
     | Identifier { let (name, span) = $1 in Variable (name, span) }
+    | LeftParen RightParen { Literal (LUnit, merge (`Span $1) (`Span $2)) }
     | LeftParen expr RightParen { $2 }
     | block_expr { $1 }
 
 if_expr:
-    | If expr Then expr Else expr { If { cond = $2; then_ = $4; else_ = Some $6; span = merge (`Span $1) (`Expr $6) } }
-    | If expr Then expr %prec THEN { If { cond = $2; then_ = $4; else_ = None; span = merge (`Span $1) (`Expr $4) } }
+    | KwIf expr KwThen expr KwElse expr { If { cond = $2; then_ = $4; else_ = Some $6; if_span = merge (`Span $1) (`Expr $6) } }
+    | KwIf expr KwThen expr %prec THEN { If { cond = $2; then_ = $4; else_ = None; if_span = merge (`Span $1) (`Expr $4) } }
 
 block_expr:
     | LeftBrace expr_list RightBrace { Block ($2, merge (`Span $1) (`Span $3)) }
 
 match_expr:
-    | Match expr LeftBrace match_cases RightBrace { Match { scrutinee = $2; cases = $4; span = merge (`Span $1) (`Span $5) } }
+    | KwMatch expr LeftBrace match_cases RightBrace { Match { scrutinee = $2; cases = $4; match_span = merge (`Span $1) (`Span $5) } }
 
 match_cases:
     | Pipe match_case { [$2] }
     | Pipe match_case match_cases { $2 :: $3 }
 
 match_case:
-    | pattern Arrow expr { { pattern = $1; guard = None; body = $3; span = merge (`Pattern $1) (`Expr $3) } }
-    | pattern If expr Arrow expr { { pattern = $1; guard = Some $3; body = $5; span = merge (`Pattern $1) (`Expr $5) } }
+    | pattern Arrow expr { { pattern = $1; guard = None; case_body = $3; case_span = merge (`Pattern $1) (`Expr $3) } }
+    | pattern KwIf expr Arrow expr { { pattern = $1; guard = Some $3; case_body = $5; case_span = merge (`Pattern $1) (`Expr $5) } }
 
 pattern:
     | cons_pattern { $1 }
@@ -167,56 +191,75 @@ primary_pattern:
     | LeftParen pattern RightParen { $2 }
 
 let_expr:
-    | Let Identifier Equal expr { let (name, _) = $2 in Let { name; ty = None; body = $4; span = merge (`Span $1) (`Expr $4) } }
-    | Let Identifier Colon type_expr Equal expr { let (name, _) = $2 in Let { name; ty = Some $4; body = $6; span = merge (`Span $1) (`Expr $6) } }
-    | Let Identifier LeftParen RightParen block_expr {
+    | KwLet Identifier Equal expr {
+        let (name, _) = $2 in
+        Let { name; ty = None; let_body = $4; let_span = merge (`Span $1) (`Expr $4) }
+      }
+    | KwLet Identifier Colon type_expr Equal expr {
+        let (name, _) = $2 in
+        Let { name; ty = Some $4; let_body = $6; let_span = merge (`Span $1) (`Expr $6) }
+      }
+    | KwLet Identifier block_expr {
+        let (name, _) = $2 in
+        let is_recursive = contains_variable name $3 in
+        let lambda = Lambda { params = []; ret_ty = None; lambda_body = $3; is_recursive;
+                              lambda_span = merge (`Span $1) (`Expr $3) } in
+        Let { name; ty = None; let_body = lambda; let_span = merge (`Span $1) (`Expr $3) }
+      }
+    | KwLet Identifier Arrow ret_type block_expr {
         let (name, _) = $2 in
         let is_recursive = contains_variable name $5 in
-        let lambda = Lambda {
-            params = [];
-            ret_ty = None;
-            body = $5;
-            is_recursive;
-            span = merge (`Span $3) (`Expr $5)
-        } in
-        Let { name; ty = None; body = lambda; span = merge (`Span $1) (`Expr $5) }
-    }
-    | Let Identifier LeftParen RightParen Arrow type_expr block_expr {
+        let lambda = Lambda { params = []; ret_ty = Some $4; lambda_body = $5; is_recursive;
+                              lambda_span = merge (`Span $3) (`Expr $5) } in
+        Let { name; ty = None; let_body = lambda; let_span = merge (`Span $1) (`Expr $5) }
+      }
+    | KwLet Identifier LeftParen RightParen block_expr {
         let (name, _) = $2 in
-        let is_recursive = contains_variable name $7 in
-        let lambda = Lambda {
-            params = [];
-            ret_ty = Some $6;
-            body = $7;
-            is_recursive;
-            span = merge (`Span $3) (`Expr $7)
-        } in
-        Let { name; ty = None; body = lambda; span = merge (`Span $1) (`Expr $7) }
-    }
-    | Let Identifier LeftParen param_list RightParen block_expr {
+        let is_recursive = contains_variable name $5 in
+        let lambda = Lambda { params = []; ret_ty = None; lambda_body = $5; is_recursive;
+                              lambda_span = merge (`Span $3) (`Expr $5) } in
+        Let { name; ty = None; let_body = lambda; let_span = merge (`Span $1) (`Expr $5) }
+      }
+    | KwLet Identifier LeftParen param_list RightParen block_expr {
         let (name, _) = $2 in
         let is_recursive = contains_variable name $6 in
-        let lambda = Lambda {
-            params = $4;
-            ret_ty = None;
-            body = $6;
-            is_recursive;
-            span = merge (`Span $3) (`Expr $6)
-        } in
-        Let { name; ty = None; body = lambda; span = merge (`Span $3) (`Expr $6) }
-    }
-    | Let Identifier LeftParen param_list RightParen Arrow type_expr block_expr {
+        let lambda = Lambda { params = $4; ret_ty = None; lambda_body = $6; is_recursive;
+                              lambda_span = merge (`Span $3) (`Expr $6) } in
+        Let { name; ty = None; let_body = lambda; let_span = merge (`Span $3) (`Expr $6) }
+      }
+    | KwLet Identifier LeftParen RightParen Arrow ret_type block_expr {
+        let (name, _) = $2 in
+        let is_recursive = contains_variable name $7 in
+        let lambda = Lambda { params = []; ret_ty = Some $6; lambda_body = $7; is_recursive;
+                              lambda_span = merge (`Span $3) (`Expr $7) } in
+        Let { name; ty = None; let_body = lambda; let_span = merge (`Span $1) (`Expr $7) }
+      }
+    | KwLet Identifier LeftParen param_list RightParen Arrow ret_type block_expr {
         let (name, _) = $2 in
         let is_recursive = contains_variable name $8 in
-        let lambda = Lambda { 
-            params = $4; 
-            ret_ty = Some $7; 
-            body = $8;
-            is_recursive;
-            span = merge (`Span $3) (`Expr $8) 
-        } in
-        Let { name; ty = None; body = lambda; span = merge (`Span $1) (`Expr $8) }
-    }
+        let lambda = Lambda { params = $4; ret_ty = Some $7; lambda_body = $8; is_recursive;
+                              lambda_span = merge (`Span $3) (`Expr $8) } in
+        Let { name; ty = None; let_body = lambda; let_span = merge (`Span $1) (`Expr $8) }
+      }
+
+ret_type:
+    | ret_type_primary                                  { $1 }
+    | ret_type_primary Arrow ret_type                   { TyFunction ([$1], $3) }
+    | LeftParen ret_type_list RightParen Arrow ret_type { TyFunction ($2, $5) }
+
+ret_type_primary:
+    | IntegerType { TyInt }
+    | FloatingPointType { TyFloat }
+    | StringType { TyString }
+    | BooleanType { TyBool }
+    | UnitType { TyUnit }
+    | Identifier { let (name, _) = $1 in TyVar name }
+    | LeftBracket ret_type RightBracket { TyList $2 }
+    | LeftParen ret_type RightParen { $2 }
+
+ret_type_list:
+    | ret_type Comma ret_type      { [$1; $3] }
+    | ret_type Comma ret_type_list { $1 :: $3 }
 
 type_expr:
     | type_primary Arrow type_expr { TyFunction ([$1], $3) }
@@ -237,17 +280,36 @@ type_expr_list:
     | type_expr Comma type_expr { [$1; $3] }
     | type_expr Comma type_expr_list { $1 :: $3 }
 
+param_type:
+    | param_type_primary { $1 }
+    | param_type_primary Arrow param_type { TyFunction ([$1], $3) }
+    | LeftParen param_type_list RightParen Arrow param_type { TyFunction ($2, $5) }
+
 param_list:
     | param_or_group { $1 }
     | param_or_group Comma param_list { $1 @ $3 }
 
+param_type_primary:
+    | IntegerType { TyInt }
+    | FloatingPointType { TyFloat }
+    | StringType { TyString }
+    | BooleanType { TyBool }
+    | UnitType { TyUnit }
+    | Identifier { let (name, _) = $1 in TyVar name }
+    | LeftBracket param_type RightBracket { TyList $2 }
+    | LeftParen param_type RightParen { $2 }
+
+param_type_list:
+    | param_type Comma param_type { [$1; $3] }
+    | param_type Comma param_type_list { $1 :: $3 }
+
 param_or_group:
     | param { [$1] }
-    | type_primary LeftBracket identifier_list RightBracket { List.map (fun (id, sp) -> { name = id; ty = Some $1; span = sp }) $3 }
+    | param_type LeftBracket identifier_list RightBracket { List.map (fun (id, sp) -> { param_name = id; param_ty = Some $1; param_span = sp }) $3 }
 
 param:
-    | Identifier { let (name, span) = $1 in { name; ty = None; span } }
-    | Identifier Colon type_expr { let (name, span) = $1 in { name; ty = Some $3; span } }
+    | Identifier { let (name, span) = $1 in { param_name = name; param_ty = None; param_span = span } }
+    | Identifier Colon param_type { let (name, span) = $1 in { param_name = name; param_ty = Some $3; param_span = span } }
 
 identifier_list:
     | Identifier { [$1] }

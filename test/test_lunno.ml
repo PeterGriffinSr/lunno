@@ -5,7 +5,7 @@ open Lunno_common.Error
 let parse_expr s =
   let lexbuf = Lexing.from_string s in
   let prog = Parser.program Lexer.token lexbuf in
-  match prog with
+  match prog.body with
   | [ expr ] -> expr
   | _ -> failwith "Expected single expression"
 
@@ -49,6 +49,16 @@ let assert_lexer_error ~ctxt input expected_code =
   with LexerError e ->
     assert_equal ~ctxt ~printer:string_of_code expected_code e.code
 
+let check s =
+  let prog = parse_program s in
+  Typechecker.check_program prog
+
+let assert_ok ~ctxt:_ s =
+  try check s
+  with TypeError { msg; _ } ->
+    assert_failure
+      (Printf.sprintf "Expected OK but got type error: %s\nInput: %s" msg s)
+
 let test_simple_tokens ctxt =
   assert_tokens ~ctxt "(){}[]"
     [
@@ -90,11 +100,11 @@ let test_punctuation ctxt =
 let test_keywords ctxt =
   assert_tokens ~ctxt "let if then else match"
     [
-      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
-      Parser.If (Lexing.dummy_pos, Lexing.dummy_pos);
-      Parser.Then (Lexing.dummy_pos, Lexing.dummy_pos);
-      Parser.Else (Lexing.dummy_pos, Lexing.dummy_pos);
-      Parser.Match (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwIf (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwThen (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwElse (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwMatch (Lexing.dummy_pos, Lexing.dummy_pos);
     ]
 
 let test_types ctxt =
@@ -213,28 +223,28 @@ let test_invalid_escape ctxt =
 let test_comments ctxt =
   assert_tokens ~ctxt "let # this is a comment\n x"
     [
-      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_multiple_comments ctxt =
   assert_tokens ~ctxt "let #comment1\n #comment2\n x"
     [
-      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_whitespace ctxt =
   assert_tokens ~ctxt "   \n\t let   x   "
     [
-      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
 let test_whitespace_variants ctxt =
   assert_tokens ~ctxt "let\t x \r\n y"
     [
-      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
       Parser.Identifier ("y", (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
@@ -284,7 +294,7 @@ let test_token_adjacency ctxt =
 
 let test_comment_eof ctxt =
   assert_tokens ~ctxt "let # comment"
-    [ Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos) ]
+    [ Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos) ]
 
 let test_comment_inline ctxt =
   assert_tokens ~ctxt "x # hi\n y"
@@ -308,17 +318,17 @@ let test_small_program ctxt =
   let code = "let x = 42 if x > 0 then x else 0" in
   assert_tokens ~ctxt code
     [
-      Parser.Let (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwLet (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
       Parser.Equal (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Integer (42L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Parser.If (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwIf (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
       Parser.Greater (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
-      Parser.Then (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwThen (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Identifier ("x", (Lexing.dummy_pos, Lexing.dummy_pos));
-      Parser.Else (Lexing.dummy_pos, Lexing.dummy_pos);
+      Parser.KwElse (Lexing.dummy_pos, Lexing.dummy_pos);
       Parser.Integer (0L, (Lexing.dummy_pos, Lexing.dummy_pos));
     ]
 
@@ -336,7 +346,7 @@ let test_many_identifiers ctxt =
 let test_span_tracking ctxt =
   let lexbuf = Lexing.from_string "let x" in
   match Lexer.token lexbuf with
-  | Parser.Let (start, stop) ->
+  | Parser.KwLet (start, stop) ->
       assert_equal ~ctxt 0 start.pos_cnum;
       assert_equal ~ctxt 3 stop.pos_cnum
   | _ -> assert_failure "Expected Let token"
@@ -365,7 +375,7 @@ let test_simple_addition ctxt =
   match parse_expr "1 + 2" with
   | Binary
       {
-        op = OpAdd;
+        binary_op = OpAdd;
         left = Literal (LInt 1L, _);
         right = Literal (LInt 2L, _);
         _;
@@ -377,11 +387,11 @@ let test_addition_left_associative ctxt =
   match parse_expr "1 + 2 + 3" with
   | Binary
       {
-        op = OpAdd;
+        binary_op = OpAdd;
         left =
           Binary
             {
-              op = OpAdd;
+              binary_op = OpAdd;
               left = Literal (LInt 1L, _);
               right = Literal (LInt 2L, _);
               _;
@@ -396,12 +406,12 @@ let test_multiplication_precedence ctxt =
   match parse_expr "1 + 2 * 3" with
   | Binary
       {
-        op = OpAdd;
+        binary_op = OpAdd;
         left = Literal (LInt 1L, _);
         right =
           Binary
             {
-              op = OpMul;
+              binary_op = OpMul;
               left = Literal (LInt 2L, _);
               right = Literal (LInt 3L, _);
               _;
@@ -415,8 +425,8 @@ let test_parentheses ctxt =
   match parse_expr "(1 + 2) * 3" with
   | Binary
       {
-        op = OpMul;
-        left = Binary { op = OpAdd; _ };
+        binary_op = OpMul;
+        left = Binary { binary_op = OpAdd; _ };
         right = Literal (LInt 3L, _);
         _;
       } ->
@@ -427,7 +437,7 @@ let test_subtraction ctxt =
   match parse_expr "5 - 3" with
   | Binary
       {
-        op = OpSub;
+        binary_op = OpSub;
         left = Literal (LInt 5L, _);
         right = Literal (LInt 3L, _);
         _;
@@ -439,7 +449,7 @@ let test_division ctxt =
   match parse_expr "10 / 2" with
   | Binary
       {
-        op = OpDiv;
+        binary_op = OpDiv;
         left = Literal (LInt 10L, _);
         right = Literal (LInt 2L, _);
         _;
@@ -449,13 +459,19 @@ let test_division ctxt =
 
 let test_mixed_arithmetic ctxt =
   match parse_expr "1 + 2 - 3 * 4 / 5" with
-  | Binary { op = OpSub; left = Binary { op = OpAdd; _ }; _ } -> ()
+  | Binary { binary_op = OpSub; left = Binary { binary_op = OpAdd; _ }; _ } ->
+      ()
   | _ -> assert_failure "Expected mixed arithmetic with correct precedence"
 
 let test_comparison ctxt =
   match parse_expr "x < y" with
   | Binary
-      { op = OpLess; left = Variable ("x", _); right = Variable ("y", _); _ } ->
+      {
+        binary_op = OpLess;
+        left = Variable ("x", _);
+        right = Variable ("y", _);
+        _;
+      } ->
       ()
   | _ -> assert_failure "Expected less-than comparison"
 
@@ -463,9 +479,9 @@ let test_comparison_precedence ctxt =
   match parse_expr "x + 1 < y * 2" with
   | Binary
       {
-        op = OpLess;
-        left = Binary { op = OpAdd; _ };
-        right = Binary { op = OpMul; _ };
+        binary_op = OpLess;
+        left = Binary { binary_op = OpAdd; _ };
+        right = Binary { binary_op = OpMul; _ };
         _;
       } ->
       ()
@@ -473,12 +489,13 @@ let test_comparison_precedence ctxt =
 
 let test_simple_let ctxt =
   match parse_expr "let x = 42" with
-  | Let { name = "x"; ty = None; body = Literal (LInt 42L, _); _ } -> ()
+  | Let { name = "x"; ty = None; let_body = Literal (LInt 42L, _); _ } -> ()
   | _ -> assert_failure "Expected let binding"
 
 let test_typed_let ctxt =
   match parse_expr "let x: int = 42" with
-  | Let { name = "x"; ty = Some TyInt; body = Literal (LInt 42L, _); _ } -> ()
+  | Let { name = "x"; ty = Some TyInt; let_body = Literal (LInt 42L, _); _ } ->
+      ()
   | _ -> assert_failure "Expected typed let binding"
 
 let test_single_expr_block ctxt =
@@ -515,7 +532,7 @@ let test_function_call_with_arithmetic ctxt =
   match parse_expr "foo(x + 1, y * 2)" with
   | Apply
       ( Variable ("foo", _),
-        [ Binary { op = OpAdd; _ }; Binary { op = OpMul; _ } ],
+        [ Binary { binary_op = OpAdd; _ }; Binary { binary_op = OpMul; _ } ],
         _ ) ->
       ()
   | _ -> assert_failure "Expected function call with arithmetic arguments"
@@ -529,65 +546,69 @@ let test_function_no_params ctxt = assert_parses ~ctxt "let f() { 42 }"
 
 let test_function_untyped_params ctxt =
   match parse_expr "let f(x, y) { x + y }" with
-  | Let { name = "f"; body = Lambda { params; ret_ty = None; _ }; _ } -> (
+  | Let { name = "f"; let_body = Lambda { params; ret_ty = None; _ }; _ } -> (
       assert_equal ~ctxt 2 (List.length params);
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt "x" p1.name;
-          assert_equal ~ctxt "y" p2.name;
-          assert_equal ~ctxt None p1.ty;
-          assert_equal ~ctxt None p2.ty
+          assert_equal ~ctxt "x" p1.param_name;
+          assert_equal ~ctxt "y" p2.param_name;
+          assert_equal ~ctxt None p1.param_ty;
+          assert_equal ~ctxt None p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function definition"
 
 let test_function_typed_params ctxt =
   match parse_expr "let f(x: int, y: int) -> int { x + y }" with
-  | Let { name = "f"; body = Lambda { params; ret_ty = Some Ast.TyInt; _ }; _ }
-    -> (
+  | Let
+      {
+        name = "f";
+        let_body = Lambda { params; ret_ty = Some Ast.TyInt; _ };
+        _;
+      } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.ty
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected typed function"
 
 let test_function_mixed_params ctxt =
   match parse_expr "let f(x: int, y) -> int { x + y }" with
-  | Let { body = Lambda { params; _ }; _ } -> (
+  | Let { let_body = Lambda { params; _ }; _ } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.ty;
-          assert_equal ~ctxt None p2.ty
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt None p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with mixed params"
 
 let test_function_uniform_syntax ctxt =
   match parse_expr "let f(int[x, y]) -> int { x + y }" with
-  | Let { body = Lambda { params; _ }; _ } -> (
+  | Let { let_body = Lambda { params; _ }; _ } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt "x" p1.name;
-          assert_equal ~ctxt "y" p2.name;
-          assert_equal ~ctxt (Some Ast.TyInt) p1.ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.ty
+          assert_equal ~ctxt "x" p1.param_name;
+          assert_equal ~ctxt "y" p2.param_name;
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with uniform syntax"
 
 let test_function_mixed_uniform_syntax ctxt =
   match parse_expr "let f(int[x, y], z: string) -> int { x + y }" with
-  | Let { body = Lambda { params; _ }; _ } -> (
+  | Let { let_body = Lambda { params; _ }; _ } -> (
       assert_equal ~ctxt 3 (List.length params);
       match params with
       | [ p1; p2; p3 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.ty;
-          assert_equal ~ctxt (Some Ast.TyString) p3.ty
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty;
+          assert_equal ~ctxt (Some Ast.TyString) p3.param_ty
       | _ -> assert_failure "Expected 3 params")
   | _ -> assert_failure "Expected function with mixed uniform syntax"
 
 let test_multiple_top_level_exprs ctxt =
   let prog = parse_program "let x = 1\nlet y = 2\nx + y" in
-  assert_equal ~ctxt 3 (List.length prog)
+  assert_equal ~ctxt 3 (List.length prog.body)
 
 let test_nested_functions ctxt =
   assert_parses ~ctxt
@@ -628,33 +649,33 @@ let test_block_with_function_call ctxt =
 
 let test_let_with_arithmetic_body ctxt =
   match parse_expr "let x = 1 + 2 * 3" with
-  | Let { body = Binary { op = OpAdd; _ }; _ } -> ()
+  | Let { let_body = Binary { binary_op = OpAdd; _ }; _ } -> ()
   | _ -> assert_failure "Expected let with arithmetic body"
 
 let test_let_with_function_call_body ctxt =
   match parse_expr "let x = foo(42)" with
-  | Let { body = Apply _; _ } -> ()
+  | Let { let_body = Apply _; _ } -> ()
   | _ -> assert_failure "Expected let with function call body"
 
 let test_let_with_block_body ctxt =
   match parse_expr "let x = { let y = 1\n y + 1 }" with
-  | Let { body = Block _; _ } -> ()
+  | Let { let_body = Block _; _ } -> ()
   | _ -> assert_failure "Expected let with block body"
 
 let test_sequential_lets ctxt =
   let prog = parse_program "let x = 1\nlet y = 2\nlet z = 3" in
-  match prog with
+  match prog.body with
   | [ Let _; Let _; Let _ ] -> ()
   | _ -> assert_failure "Expected three sequential lets"
 
 let test_recursive_function_detection ctxt =
   match parse_expr "let fib(n: int) -> int { fib(n - 1) }" with
-  | Let { body = Lambda { is_recursive = true; _ }; _ } -> ()
+  | Let { let_body = Lambda { is_recursive = true; _ }; _ } -> ()
   | _ -> assert_failure "Expected recursive function to be detected"
 
 let test_non_recursive_function ctxt =
   match parse_expr "let id(x: int) -> int { x }" with
-  | Let { body = Lambda { is_recursive = false; _ }; _ } -> ()
+  | Let { let_body = Lambda { is_recursive = false; _ }; _ } -> ()
   | _ -> assert_failure "Expected non-recursive function"
 
 let test_function_with_multiple_return_points ctxt =
@@ -680,7 +701,7 @@ let test_if_with_comparison ctxt =
   match parse_expr "if x > 0 then 1 else 1" with
   | If
       {
-        cond = Binary { op = OpGreater; _ };
+        cond = Binary { binary_op = OpGreater; _ };
         then_ = Literal (LInt 1L, _);
         else_ = Some (Literal (LInt 1L, _));
         _;
@@ -692,7 +713,7 @@ let test_if_without_else ctxt =
   match parse_expr "if x > 0 then x" with
   | If
       {
-        cond = Binary { op = OpGreater; _ };
+        cond = Binary { binary_op = OpGreater; _ };
         then_ = Variable ("x", _);
         else_ = None;
         _;
@@ -704,11 +725,12 @@ let test_nested_if_in_then ctxt =
   match parse_expr "if x > 0 then if y > 0 then 1 else 2 else 3" with
   | If
       {
-        cond = Binary { op = OpGreater; left = Variable ("x", _); _ };
+        cond = Binary { binary_op = OpGreater; left = Variable ("x", _); _ };
         then_ =
           If
             {
-              cond = Binary { op = OpGreater; left = Variable ("y", _); _ };
+              cond =
+                Binary { binary_op = OpGreater; left = Variable ("y", _); _ };
               then_ = Literal (LInt 1L, _);
               else_ = Some (Literal (LInt 2L, _));
               _;
@@ -741,11 +763,12 @@ let test_dangling_else_associates_nearest ctxt =
   match parse_expr "if x > 0 then if y > 0 then 1 else 2" with
   | If
       {
-        cond = Binary { op = OpGreater; left = Variable ("x", _); _ };
+        cond = Binary { binary_op = OpGreater; left = Variable ("x", _); _ };
         then_ =
           If
             {
-              cond = Binary { op = OpGreater; left = Variable ("y", _); _ };
+              cond =
+                Binary { binary_op = OpGreater; left = Variable ("y", _); _ };
               then_ = Literal (LInt 1L, _);
               else_ = Some (Literal (LInt 2L, _));
               _;
@@ -774,8 +797,8 @@ let test_if_then_arithmetic ctxt =
   match parse_expr "if x > 0 then x + 1 else x - 1" with
   | If
       {
-        then_ = Binary { op = OpAdd; _ };
-        else_ = Some (Binary { op = OpSub; _ });
+        then_ = Binary { binary_op = OpAdd; _ };
+        else_ = Some (Binary { binary_op = OpSub; _ });
         _;
       } ->
       ()
@@ -800,23 +823,23 @@ let test_if_with_multiple_comparisons ctxt =
 
 let test_if_with_equality ctxt =
   match parse_expr "if x = 0 then 1 else 0" with
-  | If { cond = Binary { op = OpEqual; _ }; _ } -> ()
+  | If { cond = Binary { binary_op = OpEqual; _ }; _ } -> ()
   | _ -> assert_failure "Expected equality comparison"
 
 let test_if_with_inequality ctxt =
   match parse_expr "if x <> 0 then 1 else 0" with
-  | If { cond = Binary { op = OpNotEqual; _ }; _ } -> ()
+  | If { cond = Binary { binary_op = OpNotEqual; _ }; _ } -> ()
   | _ -> assert_failure "Expected inequality comparison"
 
 let test_sequential_ifs ctxt =
   let prog = parse_program "if x > 0 then 1 else 0\nif y > 0 then 2 else 0" in
-  match prog with
+  match prog.body with
   | [ If _; If _ ] -> ()
   | _ -> assert_failure "Expected two separate if expressions"
 
 let test_if_after_let ctxt =
   let prog = parse_program "let x = 42\nif x > 0 then x else 0" in
-  match prog with
+  match prog.body with
   | [ Let _; If _ ] -> ()
   | _ -> assert_failure "Expected let followed by if"
 
@@ -865,10 +888,8 @@ let test_if_with_boolean_literals ctxt =
 
 let test_if_result_in_let ctxt =
   match parse_expr "let result = if x > 0 then 1 else 0" with
-  | Let { body = If _; _ } -> ()
+  | Let { let_body = If _; _ } -> ()
   | _ -> assert_failure "Expected if expression as let body"
-
-(* Match Expression Tests *)
 
 let test_match_simple_literal ctxt =
   match parse_expr "match x { | 0 -> 1 | 1 -> 2 }" with
@@ -880,13 +901,13 @@ let test_match_simple_literal ctxt =
             {
               pattern = PIntLiteral (0L, _);
               guard = None;
-              body = Literal (LInt 1L, _);
+              case_body = Literal (LInt 1L, _);
               _;
             };
             {
               pattern = PIntLiteral (1L, _);
               guard = None;
-              body = Literal (LInt 2L, _);
+              case_body = Literal (LInt 2L, _);
               _;
             };
           ];
@@ -899,7 +920,8 @@ let test_match_wildcard ctxt =
   match parse_expr "match x { | _ -> 0 }" with
   | Match
       {
-        cases = [ { pattern = PWildcard _; body = Literal (LInt 0L, _); _ } ];
+        cases =
+          [ { pattern = PWildcard _; case_body = Literal (LInt 0L, _); _ } ];
         _;
       } ->
       ()
@@ -910,7 +932,7 @@ let test_match_variable_pattern ctxt =
   | Match
       {
         cases =
-          [ { pattern = PVariable ("y", _); body = Variable ("y", _); _ } ];
+          [ { pattern = PVariable ("y", _); case_body = Variable ("y", _); _ } ];
         _;
       } ->
       ()
@@ -919,7 +941,10 @@ let test_match_variable_pattern ctxt =
 let test_match_nil_pattern ctxt =
   match parse_expr "match lst { | [] -> 0 }" with
   | Match
-      { cases = [ { pattern = PNil _; body = Literal (LInt 0L, _); _ } ]; _ } ->
+      {
+        cases = [ { pattern = PNil _; case_body = Literal (LInt 0L, _); _ } ];
+        _;
+      } ->
       ()
   | _ -> assert_failure "Expected match with nil pattern"
 
@@ -931,7 +956,7 @@ let test_match_cons_pattern ctxt =
           [
             {
               pattern = PCons (PVariable ("x", _), PVariable ("xs", _), _);
-              body = Variable ("x", _);
+              case_body = Variable ("x", _);
               _;
             };
           ];
@@ -968,8 +993,8 @@ let test_match_with_guard ctxt =
           [
             {
               pattern = PVariable ("n", _);
-              guard = Some (Binary { op = OpGreater; _ });
-              body = Variable ("n", _);
+              guard = Some (Binary { binary_op = OpGreater; _ });
+              case_body = Variable ("n", _);
               _;
             };
           ];
@@ -986,8 +1011,8 @@ let test_match_multiple_guards ctxt =
       {
         cases =
           [
-            { guard = Some (Binary { op = OpGreater; _ }); _ };
-            { guard = Some (Binary { op = OpLess; _ }); _ };
+            { guard = Some (Binary { binary_op = OpGreater; _ }); _ };
+            { guard = Some (Binary { binary_op = OpLess; _ }); _ };
             { pattern = PWildcard _; guard = None; _ };
           ];
         _;
@@ -1046,7 +1071,7 @@ let test_match_complex_body ctxt =
           [
             {
               pattern = PIntLiteral (0L, _);
-              body = Block ([ Let _; Binary { op = OpAdd; _ } ], _);
+              case_body = Block ([ Let _; Binary { binary_op = OpAdd; _ } ], _);
               _;
             };
           ];
@@ -1061,7 +1086,11 @@ let test_match_block_body ctxt =
       {
         cases =
           [
-            { pattern = PIntLiteral (0L, _); body = Block ([ Let _; _ ], _); _ };
+            {
+              pattern = PIntLiteral (0L, _);
+              case_body = Block ([ Let _; _ ], _);
+              _;
+            };
           ];
         _;
       } ->
@@ -1071,7 +1100,10 @@ let test_match_block_body ctxt =
 let test_match_nested_match ctxt =
   match parse_expr "match x { | 0 -> match y { | 1 -> 2 } }" with
   | Match
-      { cases = [ { pattern = PIntLiteral (0L, _); body = Match _; _ } ]; _ } ->
+      {
+        cases = [ { pattern = PIntLiteral (0L, _); case_body = Match _; _ } ];
+        _;
+      } ->
       ()
   | _ -> assert_failure "Expected nested match"
 
@@ -1079,10 +1111,10 @@ let test_match_in_function ctxt =
   match parse_expr "let f(x: int) -> int { match x { | 0 -> 1 | _ -> x } }" with
   | Let
       {
-        body =
+        let_body =
           Lambda
             {
-              body =
+              lambda_body =
                 Block
                   ( [
                       Match
@@ -1107,7 +1139,7 @@ let test_match_complex_scrutinee ctxt =
   match parse_expr "match x + 1 { | 2 -> 1 }" with
   | Match
       {
-        scrutinee = Binary { op = OpAdd; _ };
+        scrutinee = Binary { binary_op = OpAdd; _ };
         cases = [ { pattern = PIntLiteral (2L, _); _ } ];
         _;
       } ->
@@ -1126,7 +1158,7 @@ let test_match_parenthesized_pattern ctxt =
   | Match
       {
         cases =
-          [ { pattern = PVariable ("y", _); body = Variable ("y", _); _ } ];
+          [ { pattern = PVariable ("y", _); case_body = Variable ("y", _); _ } ];
         _;
       } ->
       ()
@@ -1149,7 +1181,9 @@ let test_match_multiple_cases ctxt =
 
 let test_match_guard_with_equality ctxt =
   match parse_expr "match x { | n if n = 0 -> 1 }" with
-  | Match { cases = [ { guard = Some (Binary { op = OpEqual; _ }); _ } ]; _ } ->
+  | Match
+      { cases = [ { guard = Some (Binary { binary_op = OpEqual; _ }); _ } ]; _ }
+    ->
       ()
   | _ -> assert_failure "Expected match with equality guard"
 
@@ -1163,7 +1197,11 @@ let test_match_guard_with_complex_expr ctxt =
               guard =
                 Some
                   (Binary
-                     { op = OpGreater; right = Binary { op = OpAdd; _ }; _ });
+                     {
+                       binary_op = OpGreater;
+                       right = Binary { binary_op = OpAdd; _ };
+                       _;
+                     });
               _;
             };
           ];
@@ -1174,7 +1212,7 @@ let test_match_guard_with_complex_expr ctxt =
 
 let test_match_result_in_let ctxt =
   match parse_expr "let result = match x { | 0 -> 1 | _ -> 0 }" with
-  | Let { body = Match _; _ } -> ()
+  | Let { let_body = Match _; _ } -> ()
   | _ -> assert_failure "Expected match as let body"
 
 let test_match_as_function_argument ctxt =
@@ -1184,13 +1222,13 @@ let test_match_as_function_argument ctxt =
 
 let test_match_sequential ctxt =
   let prog = parse_program "match x { | 0 -> 1 }\nmatch y { | 0 -> 2 }" in
-  match prog with
+  match prog.body with
   | [ Match _; Match _ ] -> ()
   | _ -> assert_failure "Expected two sequential matches"
 
 let test_match_after_let ctxt =
   let prog = parse_program "let x = 42\nmatch x { | 42 -> 1 }" in
-  match prog with
+  match prog.body with
   | [ Let _; Match _ ] -> ()
   | _ -> assert_failure "Expected let followed by match"
 
@@ -1251,9 +1289,21 @@ let test_match_fibonacci_style ctxt =
       {
         cases =
           [
-            { pattern = PIntLiteral (0L, _); body = Literal (LInt 0L, _); _ };
-            { pattern = PIntLiteral (1L, _); body = Literal (LInt 1L, _); _ };
-            { pattern = PVariable ("m", _); body = Binary { op = OpAdd; _ }; _ };
+            {
+              pattern = PIntLiteral (0L, _);
+              case_body = Literal (LInt 0L, _);
+              _;
+            };
+            {
+              pattern = PIntLiteral (1L, _);
+              case_body = Literal (LInt 1L, _);
+              _;
+            };
+            {
+              pattern = PVariable ("m", _);
+              case_body = Binary { binary_op = OpAdd; _ };
+              _;
+            };
           ];
         _;
       } ->
@@ -1266,10 +1316,10 @@ let test_match_list_length_style ctxt =
       {
         cases =
           [
-            { pattern = PNil _; body = Literal (LInt 0L, _); _ };
+            { pattern = PNil _; case_body = Literal (LInt 0L, _); _ };
             {
               pattern = PCons (PWildcard _, PVariable ("xs", _), _);
-              body = Binary { op = OpAdd; _ };
+              case_body = Binary { binary_op = OpAdd; _ };
               _;
             };
           ];
@@ -1280,7 +1330,9 @@ let test_match_list_length_style ctxt =
 
 let test_match_with_if_in_body ctxt =
   match parse_expr "match x { | n -> if n > 0 then n else 0 }" with
-  | Match { cases = [ { pattern = PVariable ("n", _); body = If _; _ } ]; _ } ->
+  | Match
+      { cases = [ { pattern = PVariable ("n", _); case_body = If _; _ } ]; _ }
+    ->
       ()
   | _ -> assert_failure "Expected match with if in body"
 
@@ -1297,6 +1349,267 @@ let test_match_exhaustive_bool ctxt =
       } ->
       ()
   | _ -> assert_failure "Expected exhaustive boolean match"
+
+let assert_error ~ctxt:_ ?(code = None) s =
+  try
+    check s;
+    assert_failure
+      (Printf.sprintf "Expected type error but got none\nInput: %s" s)
+  with TypeError { code = actual_code; _ } -> (
+    match code with
+    | Some expected -> assert_equal expected actual_code
+    | None -> ())
+
+let tc_test_int_literal ctxt = assert_ok ~ctxt "42"
+let tc_test_float_literal ctxt = assert_ok ~ctxt "3.14"
+let tc_test_string_literal ctxt = assert_ok ~ctxt "\"hello\""
+let tc_test_bool_literal ctxt = assert_ok ~ctxt "true"
+let tc_test_unit_literal ctxt = assert_ok ~ctxt "let f -> unit { f() }"
+let tc_test_let_int ctxt = assert_ok ~ctxt "let x: int = 42"
+let tc_test_let_float ctxt = assert_ok ~ctxt "let x: float = 3.14"
+let tc_test_let_string ctxt = assert_ok ~ctxt "let x: string = \"hello\""
+let tc_test_let_bool ctxt = assert_ok ~ctxt "let x: bool = true"
+
+let tc_test_let_annotation_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "let x: int = 3.14"
+
+let tc_test_let_annotation_mismatch_string ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "let x: string = 42"
+
+let tc_test_let_no_annotation ctxt = assert_ok ~ctxt "let x = 42"
+
+let tc_test_let_duplicate_top_level ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_AlreadyDefined) "let x = 1\nlet x = 2"
+
+let tc_test_let_duplicate_in_block ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_AlreadyDefined)
+    "let f() { let x = 1\n let x = 2\n x }"
+
+let tc_test_let_param_duplicate ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_AlreadyDefined)
+    "let f(x: int) -> int { let x = 2\n x }"
+
+let tc_test_undefined_variable ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_UndefinedVariable) "x"
+
+let tc_test_variable_in_scope ctxt = assert_ok ~ctxt "let x = 42\nx"
+
+let tc_test_variable_used_before_definition ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_UndefinedVariable) "let f() { x }"
+
+let tc_test_simple_function ctxt = assert_ok ~ctxt "let f(x: int) -> int { x }"
+
+let tc_test_function_return_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    "let f(x: int) -> int { \"hello\" }"
+
+let tc_test_function_missing_annotation ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_MissingAnnotation)
+    "let f(x) -> int { 42 }"
+
+let tc_test_function_no_return_annotation ctxt =
+  assert_ok ~ctxt "let f(x: int) { x }"
+
+let tc_test_multi_param_function ctxt =
+  assert_ok ~ctxt "let f(x: int, y: int) -> int { x + y }"
+
+let tc_test_function_returning_bool ctxt =
+  assert_ok ~ctxt "let is_pos(x: int) -> bool { x > 0 }"
+
+let tc_test_function_returning_float ctxt =
+  assert_ok ~ctxt "let double(x: float) -> float { x + x }"
+
+let tc_test_function_returning_string ctxt =
+  assert_ok ~ctxt "let greet(s: string) -> string { s }"
+
+let tc_test_simple_application ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { x }\nf(42)"
+
+let tc_test_arity_mismatch_too_few ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_ArityMismatch)
+    "let f(x: int, y: int) -> int { x + y }\nf(1)"
+
+let tc_test_arity_mismatch_too_many ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_ArityMismatch)
+    "let f(x: int) -> int { x }\nf(1, 2)"
+
+let tc_test_apply_wrong_arg_type ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    "let f(x: int) -> int { x }\nf(3.14)"
+
+let tc_test_apply_not_a_function ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_NotAFunction) "let x = 42\nx(1)"
+
+let tc_test_apply_zero_args_ok ctxt = assert_ok ~ctxt "let f -> int { 42 }\nf()"
+let tc_test_int_add ctxt = assert_ok ~ctxt "1 + 2"
+let tc_test_float_add ctxt = assert_ok ~ctxt "1.0 + 2.0"
+
+let tc_test_int_float_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "1 + 2.0"
+
+let tc_test_float_int_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "1.0 + 2"
+
+let tc_test_int_sub ctxt = assert_ok ~ctxt "5 - 3"
+let tc_test_int_mul ctxt = assert_ok ~ctxt "2 * 3"
+let tc_test_int_div ctxt = assert_ok ~ctxt "10 / 2"
+let tc_test_float_mul ctxt = assert_ok ~ctxt "2.0 * 3.0"
+
+let tc_test_string_add_invalid ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "\"a\" + \"b\""
+
+let tc_test_negate_int ctxt = assert_ok ~ctxt "let f(x: int) -> int { 0 - x }"
+
+let tc_test_negate_float ctxt =
+  assert_ok ~ctxt "let f(x: float) -> float { 0.0 - x }"
+
+let tc_test_negate_bool_invalid ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    "let f(x: bool) -> int { x + 1 }"
+
+let tc_test_int_less ctxt = assert_ok ~ctxt "1 < 2"
+let tc_test_int_greater ctxt = assert_ok ~ctxt "2 > 1"
+let tc_test_float_less ctxt = assert_ok ~ctxt "1.0 < 2.0"
+let tc_test_int_equal ctxt = assert_ok ~ctxt "1 = 1"
+let tc_test_int_not_equal ctxt = assert_ok ~ctxt "1 <> 2"
+let tc_test_bool_equal ctxt = assert_ok ~ctxt "true = false"
+let tc_test_string_equal ctxt = assert_ok ~ctxt "\"a\" = \"b\""
+
+let tc_test_compare_type_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "1 < 2.0"
+
+let tc_test_equal_type_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "1 = true"
+
+let tc_test_simple_if ctxt = assert_ok ~ctxt "if true then 1 else 0"
+
+let tc_test_if_with_condition ctxt =
+  assert_ok ~ctxt "let x = 5\nif x > 0 then x else 0"
+
+let tc_test_if_branch_type_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_IfBranchMismatch)
+    "if true then 1 else \"hello\""
+
+let tc_test_if_condition_not_bool ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch) "if 1 then 1 else 0"
+
+let tc_test_if_missing_else ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_MissingElseBranch)
+    "let f(x: int) -> int { if x > 0 then x }"
+
+let tc_test_if_float_branches ctxt = assert_ok ~ctxt "if true then 1.0 else 2.0"
+
+let tc_test_if_string_branches ctxt =
+  assert_ok ~ctxt "if true then \"a\" else \"b\""
+
+let tc_test_nested_if ctxt =
+  assert_ok ~ctxt "if true then (if false then 1 else 2) else 3"
+
+let tc_test_if_in_function ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { if x > 0 then x else 0 }"
+
+let tc_test_match_int ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { match x { | 0 -> 0 | _ -> 1 } }"
+
+let tc_test_match_bool ctxt =
+  assert_ok ~ctxt
+    "let f(b: bool) -> int { match b { | true -> 1 | false -> 0 } }"
+
+let tc_test_match_branch_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_MatchBranchMismatch)
+    "let f(x: int) -> int { match x { | 0 -> 1 | _ -> \"hello\" } }"
+
+let tc_test_match_pattern_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_PatternTypeMismatch)
+    "let f(x: int) -> int { match x { | \"hello\" -> 1 } }"
+
+let tc_test_match_wildcard ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { match x { | _ -> 42 } }"
+
+let tc_test_match_variable_pattern ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { match x { | n -> n } }"
+
+let tc_test_match_variable_used_in_body ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { match x { | n -> n + 1 } }"
+
+let tc_test_match_with_guard ctxt =
+  assert_ok ~ctxt
+    "let f(x: int) -> int { match x { | n if n > 0 -> n | _ -> 0 } }"
+
+let tc_test_match_guard_not_bool ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    "let f(x: int) -> int { match x { | n if n + 1 -> n | _ -> 0 } }"
+
+let tc_test_match_nil_pattern ctxt =
+  assert_ok ~ctxt "let f(xs: [int]) -> int { match xs { | [] -> 0 | _ -> 1 } }"
+
+let tc_test_match_cons_pattern ctxt =
+  assert_ok ~ctxt
+    "let f(xs: [int]) -> int { match xs { | x :: _ -> x | [] -> 0 } }"
+
+let tc_test_match_string ctxt =
+  assert_ok ~ctxt
+    "let f(s: string) -> int { match s { | \"hello\" -> 1 | _ -> 0 } }"
+
+let tc_test_recursive_function ctxt =
+  assert_ok ~ctxt
+    "let fib(n: int) -> int { match n { | 0 -> 0 | 1 -> 1 | m -> fib(m - 1) + \
+     fib(m - 2) } }"
+
+let tc_test_recursive_missing_return_annotation ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_MissingAnnotation)
+    "let f(n: int) { match n { | 0 -> 0 | m -> f(m - 1) } }"
+
+let tc_test_nested_recursive_function ctxt =
+  assert_ok ~ctxt
+    {|let fib(n: int) -> int {
+        let fib_aux(int[m, a, b]) -> int {
+          match m {
+            | 0 -> a
+            | _ -> fib_aux(m - 1, b, a + b)
+          }
+        }
+        fib_aux(n, 0, 1)
+      }|}
+
+let tc_test_block_returns_last ctxt =
+  assert_ok ~ctxt "let f -> int { let x = 1\n let y = 2\n x + y }"
+
+let tc_test_block_let_scoping ctxt =
+  assert_ok ~ctxt "let f -> int { let x = 10\n x }"
+
+let tc_test_block_sequential_lets ctxt =
+  assert_ok ~ctxt "let f -> int { let x = 1\n let y = x + 1\n y }"
+
+let tc_test_block_let_uses_previous ctxt =
+  assert_ok ~ctxt "let f(x: int) -> int { let y = x + 1\n let z = y + 1\n z }"
+
+let tc_test_match_nil ctxt =
+  assert_ok ~ctxt "let f(xs: [int]) -> int { match xs { | [] -> 0 | _ -> 1 } }"
+
+let tc_test_match_cons_head ctxt =
+  assert_ok ~ctxt
+    "let f(xs: [int]) -> int { match xs { | x :: _ -> x | [] -> 0 } }"
+
+let tc_test_match_cons_wrong_type ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_PatternTypeMismatch)
+    "let f(xs: [int]) -> int { match xs { | \"a\" :: _ -> 1 | _ -> 0 } }"
+
+let tc_test_function_as_arg ctxt =
+  assert_ok ~ctxt
+    "let apply(f: (int) -> int, x: int) -> int { f(x) }\n\
+     let double(x: int) -> int { x * 2 }\n\
+     apply(double, 5)"
+
+let tc_test_function_return_type ctxt =
+  assert_ok ~ctxt
+    "let add(x: int) -> (int) -> int { let inner(y: int) -> int { x + y }\n\
+    \ inner }"
+
+let tc_test_primed_name ctxt = assert_ok ~ctxt "let x = 1\nlet x' = 2\nx + x'"
+
+let tc_test_double_primed_name ctxt =
+  assert_ok ~ctxt "let x = 1\nlet x' = 2\nlet x'' = 3\nx + x' + x''"
 
 let suite =
   "lunno lexer tests"
@@ -1472,6 +1785,100 @@ let suite =
          >:: test_function_with_multiple_return_points;
          "[parser] function returning function"
          >:: test_function_returning_function;
+         "[tc] int literal" >:: tc_test_int_literal;
+         "[tc] float literal" >:: tc_test_float_literal;
+         "[tc] string literal" >:: tc_test_string_literal;
+         "[tc] bool literal" >:: tc_test_bool_literal;
+         "[tc] unit literal" >:: tc_test_unit_literal;
+         "[tc] let int" >:: tc_test_let_int;
+         "[tc] let float" >:: tc_test_let_float;
+         "[tc] let string" >:: tc_test_let_string;
+         "[tc] let bool" >:: tc_test_let_bool;
+         "[tc] let annotation mismatch" >:: tc_test_let_annotation_mismatch;
+         "[tc] let annotation mismatch string"
+         >:: tc_test_let_annotation_mismatch_string;
+         "[tc] let no annotation" >:: tc_test_let_no_annotation;
+         "[tc] let duplicate top level" >:: tc_test_let_duplicate_top_level;
+         "[tc] let duplicate in block" >:: tc_test_let_duplicate_in_block;
+         "[tc] let param duplicate" >:: tc_test_let_param_duplicate;
+         "[tc] undefined variable" >:: tc_test_undefined_variable;
+         "[tc] variable in scope" >:: tc_test_variable_in_scope;
+         "[tc] variable used before definition"
+         >:: tc_test_variable_used_before_definition;
+         "[tc] simple function" >:: tc_test_simple_function;
+         "[tc] function return mismatch" >:: tc_test_function_return_mismatch;
+         "[tc] function missing annotation"
+         >:: tc_test_function_missing_annotation;
+         "[tc] function no return annotation"
+         >:: tc_test_function_no_return_annotation;
+         "[tc] multi param function" >:: tc_test_multi_param_function;
+         "[tc] function returning bool" >:: tc_test_function_returning_bool;
+         "[tc] function returning float" >:: tc_test_function_returning_float;
+         "[tc] function returning string" >:: tc_test_function_returning_string;
+         "[tc] simple application" >:: tc_test_simple_application;
+         "[tc] arity mismatch too few" >:: tc_test_arity_mismatch_too_few;
+         "[tc] arity mismatch too many" >:: tc_test_arity_mismatch_too_many;
+         "[tc] apply wrong arg type" >:: tc_test_apply_wrong_arg_type;
+         "[tc] apply not a function" >:: tc_test_apply_not_a_function;
+         "[tc] apply zero args ok" >:: tc_test_apply_zero_args_ok;
+         "[tc] int add" >:: tc_test_int_add;
+         "[tc] float add" >:: tc_test_float_add;
+         "[tc] int float mismatch" >:: tc_test_int_float_mismatch;
+         "[tc] float int mismatch" >:: tc_test_float_int_mismatch;
+         "[tc] int sub" >:: tc_test_int_sub;
+         "[tc] int mul" >:: tc_test_int_mul;
+         "[tc] int div" >:: tc_test_int_div;
+         "[tc] float mul" >:: tc_test_float_mul;
+         "[tc] string add invalid" >:: tc_test_string_add_invalid;
+         "[tc] negate int" >:: tc_test_negate_int;
+         "[tc] negate float" >:: tc_test_negate_float;
+         "[tc] negate bool invalid" >:: tc_test_negate_bool_invalid;
+         "[tc] int less" >:: tc_test_int_less;
+         "[tc] int greater" >:: tc_test_int_greater;
+         "[tc] float less" >:: tc_test_float_less;
+         "[tc] int equal" >:: tc_test_int_equal;
+         "[tc] int not equal" >:: tc_test_int_not_equal;
+         "[tc] bool equal" >:: tc_test_bool_equal;
+         "[tc] string equal" >:: tc_test_string_equal;
+         "[tc] compare type mismatch" >:: tc_test_compare_type_mismatch;
+         "[tc] equal type mismatch" >:: tc_test_equal_type_mismatch;
+         "[tc] simple if" >:: tc_test_simple_if;
+         "[tc] if with condition" >:: tc_test_if_with_condition;
+         "[tc] if branch type mismatch" >:: tc_test_if_branch_type_mismatch;
+         "[tc] if condition not bool" >:: tc_test_if_condition_not_bool;
+         "[tc] if missing else" >:: tc_test_if_missing_else;
+         "[tc] if float branches" >:: tc_test_if_float_branches;
+         "[tc] if string branches" >:: tc_test_if_string_branches;
+         "[tc] nested if" >:: tc_test_nested_if;
+         "[tc] if in function" >:: tc_test_if_in_function;
+         "[tc] match int" >:: tc_test_match_int;
+         "[tc] match bool" >:: tc_test_match_bool;
+         "[tc] match branch mismatch" >:: tc_test_match_branch_mismatch;
+         "[tc] match pattern mismatch" >:: tc_test_match_pattern_mismatch;
+         "[tc] match wildcard" >:: tc_test_match_wildcard;
+         "[tc] match variable pattern" >:: tc_test_match_variable_pattern;
+         "[tc] match variable used in body"
+         >:: tc_test_match_variable_used_in_body;
+         "[tc] match with guard" >:: tc_test_match_with_guard;
+         "[tc] match guard not bool" >:: tc_test_match_guard_not_bool;
+         "[tc] match nil pattern" >:: tc_test_match_nil_pattern;
+         "[tc] match cons pattern" >:: tc_test_match_cons_pattern;
+         "[tc] match string" >:: tc_test_match_string;
+         "[tc] recursive function" >:: tc_test_recursive_function;
+         "[tc] recursive missing return annotation"
+         >:: tc_test_recursive_missing_return_annotation;
+         "[tc] nested recursive function" >:: tc_test_nested_recursive_function;
+         "[tc] block returns last" >:: tc_test_block_returns_last;
+         "[tc] block let scoping" >:: tc_test_block_let_scoping;
+         "[tc] block sequential lets" >:: tc_test_block_sequential_lets;
+         "[tc] block let uses previous" >:: tc_test_block_let_uses_previous;
+         "[tc] match nil" >:: tc_test_match_nil;
+         "[tc] match cons head" >:: tc_test_match_cons_head;
+         "[tc] match cons wrong type" >:: tc_test_match_cons_wrong_type;
+         "[tc] function as arg" >:: tc_test_function_as_arg;
+         "[tc] function return type" >:: tc_test_function_return_type;
+         "[tc] primed name" >:: tc_test_primed_name;
+         "[tc] double primed name" >:: tc_test_double_primed_name;
        ]
 
 let () = run_test_tt_main suite

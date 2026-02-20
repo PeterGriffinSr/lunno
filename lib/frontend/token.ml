@@ -5,11 +5,12 @@ let to_string = function
   | Parser.Identifier (id, _) -> Printf.sprintf "Identifier(%s)" id
   | Parser.Boolean (b, _) -> Printf.sprintf "Boolean(%b)" b
   | Parser.Unit ((), _) -> Printf.sprintf "Unit()"
-  | Parser.Let _ -> "Let"
-  | Parser.If _ -> "If"
-  | Parser.Then _ -> "Then"
-  | Parser.Else _ -> "Else"
-  | Parser.Match _ -> "Match"
+  | Parser.KwLet _ -> "Let"
+  | Parser.KwIf _ -> "If"
+  | Parser.KwThen _ -> "Then"
+  | Parser.KwElse _ -> "Else"
+  | Parser.KwMatch _ -> "Match"
+  | Parser.KwImport _ -> "Import"
   | Parser.IntegerType _ -> "IntegerType"
   | Parser.FloatingPointType _ -> "FloatingPointType"
   | Parser.StringType _ -> "StringType"

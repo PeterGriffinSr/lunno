@@ -4,11 +4,12 @@
     let string_buffer = Buffer.create 64
     let reserved = 
         Hashtbl.of_seq (List.to_seq [
-        "let", (fun  span -> Let span);
-        "if", (fun span -> If span);
-        "then", (fun span -> Then span);
-        "else", (fun span -> Else span);
-        "match", (fun span -> Match span);
+        "let", (fun  span -> KwLet span);
+        "if", (fun span -> KwIf span);
+        "then", (fun span -> KwThen span);
+        "else", (fun span -> KwElse span);
+        "match", (fun span -> KwMatch span);
+        "import", (fun span -> KwImport span);
         "int", (fun span -> IntegerType span);
         "float", (fun span -> FloatingPointType span);
         "string", (fun span -> StringType span);

@@ -17,11 +17,17 @@ type literal =
   | LUnit
 
 type param = {
-  name : string;  (** Parameter name. *)
-  ty : ty option;  (** Optional type annotation. *)
-  span : Lunno_common.Span.t;  (** Source code span of the parameter. *)
+  param_name : string;  (** Parameter name. *)
+  param_ty : ty option;  (** Optional type annotation. *)
+  param_span : Lunno_common.Span.t;  (** Source code span of the parameter. *)
 }
 (** The [param] type represents a function parameter. *)
+
+type import = {
+  module_ : string;
+  item : string;
+  import_span : Lunno_common.Span.t;
+}
 
 (** The [expr] type represents all expressions in the language. *)
 type expr =
@@ -40,17 +46,17 @@ type expr =
 and lambda = {
   params : param list;  (** Parameters. *)
   ret_ty : ty option;  (** Optional return type annotation. *)
-  body : expr;  (** Function body. *)
+  lambda_body : expr;  (** Function body. *)
   is_recursive : bool;
-  span : Lunno_common.Span.t;  (** Span of the whole lambda. *)
+  lambda_span : Lunno_common.Span.t;  (** Span of the whole lambda. *)
 }
 (** The [lambda] type represents anonymous functions. *)
 
 and let_expr = {
   name : string;  (** Name being bound. *)
   ty : ty option;  (** Optional type annotation. *)
-  body : expr;  (** Expression being bound. *)
-  span : Lunno_common.Span.t;  (** Span of the let expression. *)
+  let_body : expr;  (** Expression being bound. *)
+  let_span : Lunno_common.Span.t;  (** Span of the let expression. *)
 }
 (** The [let_expr] type represents let bindings. *)
 
@@ -58,22 +64,22 @@ and if_expr = {
   cond : expr;  (** Condition expression. *)
   then_ : expr;  (** Then branch. *)
   else_ : expr option;  (** Else branch. *)
-  span : Lunno_common.Span.t;  (** Span of the if expression. *)
+  if_span : Lunno_common.Span.t;  (** Span of the if expression. *)
 }
 (** The [if_expr] type represents if expressions. *)
 
 and match_expr = {
   scrutinee : expr;  (** Expression being matched on. *)
   cases : match_case list;  (** List of match cases. *)
-  span : Lunno_common.Span.t;  (** Span of the match expression. *)
+  match_span : Lunno_common.Span.t;  (** Span of the match expression. *)
 }
 (** The [match_expr] type represents match expressions. *)
 
 and match_case = {
   pattern : pattern;  (** Pattern to match. *)
   guard : expr option;  (** Optional guard expression. *)
-  body : expr;  (** Expression for the case body. *)
-  span : Lunno_common.Span.t;  (** Span of the case. *)
+  case_body : expr;  (** Expression for the case body. *)
+  case_span : Lunno_common.Span.t;  (** Span of the case. *)
 }
 (** The [match_case] type represents a single match case. *)
 
@@ -107,20 +113,23 @@ and binary_op =
 and unary_op = OpNegate  (** Unary minus operator. *)
 
 and binary_expr = {
-  op : binary_op;  (** Operator. *)
+  binary_op : binary_op;  (** Operator. *)
   left : expr;  (** Left-hand side expression. *)
   right : expr;  (** Right-hand side expression. *)
-  span : Lunno_common.Span.t;  (** Span of the binary expression. *)
+  binary_span : Lunno_common.Span.t;  (** Span of the binary expression. *)
 }
 (** The [binary_expr] type represents binary operations in expressions. *)
 
 and unary_expr = {
-  op : unary_op;  (** Operator. *)
+  unary_op : unary_op;  (** Operator. *)
   expr : expr;  (** Expression operand. *)
-  span : Lunno_common.Span.t;  (** Span of the unary expression. *)
+  unary_span : Lunno_common.Span.t;  (** Span of the unary expression. *)
 }
 (** The [unary_expr] type represents unary operations in expressions. *)
 
-type program = expr list
+val span_of_expr : expr -> Lunno_common.Span.t
+(** [span_of_expr e] returns the source span of expression [e]. *)
+
+type program = { imports : import list; body : expr list }
 (** The [program] type represents a sequence of expressions (the top-level
     program). *)

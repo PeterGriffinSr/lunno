@@ -1,0 +1,28 @@
+(env
+ (dev
+  (ocamlopt_flags
+   (:standard -g))
+  (ocamlc_flags
+   (:standard -g))
+  (flags
+   (:standard -w +a-4-8 -warn-error +a)))
+ (release
+  (ocamlopt_flags
+   (:standard
+    -O3
+    -rounds
+    5
+    -inline-toplevel
+    300
+    -inline
+    100
+    -inline-max-unroll
+    3
+    -unbox-closures
+    -unbox-closures-factor
+    20
+    -ccopt
+    -s))
+  (ocamlc_flags (:standard))
+  (flags
+   (:standard -w -a))))

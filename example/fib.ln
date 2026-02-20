@@ -1,3 +1,5 @@
+import "core:io"
+
 let fib(n: int) -> int {
     let fib_aux(int[m, a, b]) -> int {
         match m {
@@ -6,4 +8,8 @@ let fib(n: int) -> int {
         }
     }
     fib_aux(n, 0, 1)
+}
+
+let main -> unit {
+    io.print(fib(10)) # 55
 }
