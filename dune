@@ -5,7 +5,7 @@
   (ocamlc_flags
    (:standard -g))
   (flags
-   (:standard -w +a-4-8 -warn-error +a)))
+   (:standard -w +a -warn-error +a)))
  (release
   (ocamlopt_flags
    (:standard

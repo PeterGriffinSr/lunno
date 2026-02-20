@@ -106,6 +106,7 @@ import:
         match String.split_on_char ':' path with
         | [module_; item] ->
             { module_; item; import_span = merge (`Span $1) (`Span span) }
+        | [] | [_] | _ :: _ :: _ :: _ -> assert false
     }
 
 expr_list:

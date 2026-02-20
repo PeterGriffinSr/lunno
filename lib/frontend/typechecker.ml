@@ -50,7 +50,7 @@ let rec check_pattern env expected pat =
   | PNil span -> (
       match expected with
       | TyList _ -> env
-      | _ ->
+      | TyInt | TyFloat | TyString | TyBool | TyUnit | TyVar _ | TyFunction _ ->
           raise (pattern_type_mismatch (Debug.string_of_ty expected) "[_]" span)
       )
   | PCons (hd, tl, span) -> (
@@ -58,7 +58,8 @@ let rec check_pattern env expected pat =
       | TyList elem_ty ->
           let env' = check_pattern env elem_ty hd in
           check_pattern env' (TyList elem_ty) tl
-      | _ ->
+      | TyInt | TyFloat | TyString | TyBool | TyUnit | TyVar _
+      | TyFunction (_, _) ->
           raise (pattern_type_mismatch (Debug.string_of_ty expected) "[_]" span)
       )
 
@@ -89,7 +90,8 @@ let rec check_expr env expr =
                      (span_of_expr arg)))
             param_tys args;
           ret_ty
-      | _ -> raise (not_a_function (Debug.string_of_ty func_ty) span))
+      | TyInt | TyFloat | TyString | TyBool | TyUnit | TyVar _ | TyList _ ->
+          raise (not_a_function (Debug.string_of_ty func_ty) span))
   | Let { name = _; ty; let_body; let_span } ->
       let body_ty = check_expr env let_body in
       (match ty with
@@ -131,7 +133,7 @@ let rec check_expr env expr =
       let ty = check_expr env e in
       match ty with
       | TyInt | TyFloat -> ty
-      | _ ->
+      | TyString | TyBool | TyUnit | TyVar _ | TyList _ | TyFunction (_, _) ->
           raise
             (type_mismatch (Debug.string_of_ty TyInt) (Debug.string_of_ty ty)
                unary_span))
@@ -155,16 +157,20 @@ and check_lambda env lam =
   | Some ann_ret when ann_ret <> body_ty ->
       let body_span =
         match lam.lambda_body with
-        | Block (exprs, _) when exprs <> [] ->
+        | Block ((_ :: _ as exprs), _) ->
             span_of_expr (List.nth exprs (List.length exprs - 1))
-        | _ -> span_of_expr lam.lambda_body
+        | Block ([], _)
+        | Literal _ | Variable _ | Lambda _ | Apply _ | Let _ | If _ | Match _
+        | Binary _ | Unary _ ->
+            span_of_expr lam.lambda_body
       in
       raise
         (type_mismatch
            (Debug.string_of_ty ann_ret)
            (Debug.string_of_ty body_ty)
            body_span)
-  | _ -> ());
+  | Some _ -> ()
+  | None -> ());
   TyFunction (param_tys, body_ty)
 
 and check_match env scrutinee_ty cases =
@@ -217,39 +223,47 @@ and check_block env exprs _span =
     | Let { name; ty; let_body; let_span } :: rest ->
         let body_ty =
           match let_body with
-          | Lambda lam when lam.is_recursive ->
-              let param_tys =
-                List.map
-                  (fun param ->
-                    match param.param_ty with
-                    | Some t -> t
-                    | None ->
-                        raise
-                          (missing_annotation param.param_name param.param_span))
-                  lam.params
-              in
-              let ret_ty =
-                match lam.ret_ty with
-                | Some t -> t
-                | None -> raise (missing_annotation name let_span)
-              in
-              let pre_env =
-                bind_name name (TyFunction (param_tys, ret_ty)) let_span env
-              in
-              check_expr pre_env let_body
-          | _ -> check_expr env let_body
+          | Lambda lam ->
+              if lam.is_recursive then
+                let param_tys =
+                  List.map
+                    (fun param ->
+                      match param.param_ty with
+                      | Some t -> t
+                      | None ->
+                          raise
+                            (missing_annotation param.param_name
+                               param.param_span))
+                    lam.params
+                in
+                let ret_ty =
+                  match lam.ret_ty with
+                  | Some t -> t
+                  | None -> raise (missing_annotation name let_span)
+                in
+                let pre_env =
+                  bind_name name (TyFunction (param_tys, ret_ty)) let_span env
+                in
+                check_expr pre_env let_body
+              else check_expr env let_body
+          | Literal _ | Variable _ | Apply _ | Let _ | If _ | Match _ | Block _
+          | Binary _ | Unary _ ->
+              check_expr env let_body
         in
         (match ty with
-        | Some ann_ty when ann_ty <> body_ty ->
-            raise
-              (type_mismatch
-                 (Debug.string_of_ty ann_ty)
-                 (Debug.string_of_ty body_ty)
-                 let_span)
-        | _ -> ());
+        | Some ann_ty ->
+            if ann_ty <> body_ty then
+              raise
+                (type_mismatch
+                   (Debug.string_of_ty ann_ty)
+                   (Debug.string_of_ty body_ty)
+                   let_span)
+        | None -> ());
         let env' = bind_name name body_ty let_span env in
         go env' rest
-    | e :: rest ->
+    | (( Literal _ | Variable _ | Lambda _ | Apply _ | If _ | Match _ | Block _
+       | Binary _ | Unary _ ) as e)
+      :: rest ->
         let _ = check_expr env e in
         go env rest
   in
@@ -269,8 +283,13 @@ and check_binary env op left right _span =
           raise (type_mismatch "float" (Debug.string_of_ty got) right_span)
       | TyInt, got ->
           raise (type_mismatch "int" (Debug.string_of_ty got) right_span)
-      | got, _ -> raise (type_mismatch "int" (Debug.string_of_ty got) left_span)
-      )
+      | TyString, _
+      | TyBool, _
+      | TyUnit, _
+      | TyVar _, _
+      | TyList _, _
+      | TyFunction (_, _), _ ->
+          raise (type_mismatch "int" (Debug.string_of_ty left_ty) left_span))
   | OpEqual | OpNotEqual ->
       if left_ty <> right_ty then
         raise
@@ -286,8 +305,13 @@ and check_binary env op left right _span =
           raise (type_mismatch "float" (Debug.string_of_ty got) right_span)
       | TyInt, got ->
           raise (type_mismatch "int" (Debug.string_of_ty got) right_span)
-      | got, _ -> raise (type_mismatch "int" (Debug.string_of_ty got) left_span)
-      )
+      | TyString, _
+      | TyBool, _
+      | TyUnit, _
+      | TyVar _, _
+      | TyList _, _
+      | TyFunction (_, _), _ ->
+          raise (type_mismatch "int" (Debug.string_of_ty left_ty) left_span))
   | OpCons -> (
       match right_ty with
       | TyList elem_ty ->
@@ -298,7 +322,8 @@ and check_binary env op left right _span =
                  (Debug.string_of_ty left_ty)
                  left_span);
           TyList elem_ty
-      | _ ->
+      | TyInt | TyFloat | TyString | TyBool | TyUnit | TyVar _
+      | TyFunction (_, _) ->
           raise
             (type_mismatch
                (Debug.string_of_ty (TyList left_ty))
@@ -311,40 +336,48 @@ let check_program (program : program) =
     | Let { name; ty; let_body; let_span } :: rest ->
         let body_ty =
           match let_body with
-          | Lambda lam when lam.is_recursive ->
-              let param_tys =
-                List.map
-                  (fun param ->
-                    match param.param_ty with
-                    | Some t -> t
-                    | None ->
-                        raise
-                          (missing_annotation param.param_name param.param_span))
-                  lam.params
-              in
-              let ret_ty =
-                match lam.ret_ty with
-                | Some t -> t
-                | None -> raise (missing_annotation name let_span)
-              in
-              let pre_env =
-                bind_name name (TyFunction (param_tys, ret_ty)) let_span env
-              in
-              check_expr pre_env let_body
-          | _ -> check_expr env let_body
+          | Lambda lam ->
+              if lam.is_recursive then
+                let param_tys =
+                  List.map
+                    (fun param ->
+                      match param.param_ty with
+                      | Some t -> t
+                      | None ->
+                          raise
+                            (missing_annotation param.param_name
+                               param.param_span))
+                    lam.params
+                in
+                let ret_ty =
+                  match lam.ret_ty with
+                  | Some t -> t
+                  | None -> raise (missing_annotation name let_span)
+                in
+                let pre_env =
+                  bind_name name (TyFunction (param_tys, ret_ty)) let_span env
+                in
+                check_expr pre_env let_body
+              else check_expr env let_body
+          | Literal _ | Variable _ | Apply _ | Let _ | If _ | Match _ | Block _
+          | Binary _ | Unary _ ->
+              check_expr env let_body
         in
         (match ty with
-        | Some ann_ty when ann_ty <> body_ty ->
-            raise
-              (type_mismatch
-                 (Debug.string_of_ty ann_ty)
-                 (Debug.string_of_ty body_ty)
-                 let_span)
-        | _ -> ());
+        | Some ann_ty ->
+            if ann_ty <> body_ty then
+              raise
+                (type_mismatch
+                   (Debug.string_of_ty ann_ty)
+                   (Debug.string_of_ty body_ty)
+                   let_span)
+        | None -> ());
         let env' = bind_name name body_ty let_span env in
         go env' rest
-    | expr :: rest ->
-        let _ = check_expr env expr in
+    | (( Literal _ | Variable _ | Lambda _ | Apply _ | If _ | Match _ | Block _
+       | Binary _ | Unary _ ) as e)
+      :: rest ->
+        let _ = check_expr env e in
         go env rest
   in
   go Env.empty program.body

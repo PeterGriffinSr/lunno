@@ -11,32 +11,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.6.3] - 2026-02-20
+
+### Changed
+- Updated README.
+
+### Removed
+- Removed gh-pages docs generation from CI.
+
+### Fixed
+- Fixed numerous compiler warnings.
+
 ## [0.6.2] - 2026-02-20
 
 ### Fixed
-- Dependency issue with ounit2
+- Dependency issue with ounit2.
 
 ## [0.6.1] - 2026-02-20
 
 ### Added
-- Lunno opam versioning file
+- Lunno opam versioning file.
 
 ## [0.6.0] - 2026-02-20
 
 ### Added
-- Import expressions for module/file imports
-- Type checker with comprehensive validation
-- `error.ml` support for type errors and parser errors
-- Parser error diagnostics for better error reporting
-- Tests for type checker functionality
-- Updated public API with new features
+- Import expressions for module/file imports.
+- Type checker with comprehensive validation.
+- `error.ml` support for type errors and parser errors.
+- Parser error diagnostics for better error reporting.
+- Tests for type checker functionality.
+- Updated public API with new features.
 
 ### Changed
-- Updated Dune profiles for development and release compilation
-- Improved error handling and reporting system
+- Updated Dune profiles for development and release compilation.
+- Improved error handling and reporting system.
 
 ### Fixed
-- Fixed numerous compiler warnings
+- Fixed numerous compiler warnings.
 
 ## [0.5.5] - 2026-02-18
 

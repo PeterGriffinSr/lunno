@@ -8,14 +8,14 @@ let rec dump_tokens lexbuf =
   | Parser.Integer _ | Parser.FloatingPoint _ | Parser.Identifier _
   | Parser.String _ | Parser.Boolean _ | Parser.Unit _ | Parser.KwLet _
   | Parser.KwIf _ | Parser.KwThen _ | Parser.KwElse _ | Parser.KwMatch _
-  | Parser.IntegerType _ | Parser.FloatingPointType _ | Parser.StringType _
-  | Parser.BooleanType _ | Parser.UnitType _ | Parser.LeftParen _
-  | Parser.RightParen _ | Parser.LeftBrace _ | Parser.RightBrace _
-  | Parser.LeftBracket _ | Parser.RightBracket _ | Parser.Plus _
-  | Parser.Minus _ | Parser.Asterisk _ | Parser.Slash _ | Parser.Equal _
-  | Parser.NotEqual _ | Parser.Less _ | Parser.Greater _ | Parser.Comma _
-  | Parser.Colon _ | Parser.Pipe _ | Parser.Cons _ | Parser.Arrow _
-  | Parser.Underscore _ ->
+  | Parser.KwImport _ | Parser.IntegerType _ | Parser.FloatingPointType _
+  | Parser.StringType _ | Parser.BooleanType _ | Parser.UnitType _
+  | Parser.LeftParen _ | Parser.RightParen _ | Parser.LeftBrace _
+  | Parser.RightBrace _ | Parser.LeftBracket _ | Parser.RightBracket _
+  | Parser.Plus _ | Parser.Minus _ | Parser.Asterisk _ | Parser.Slash _
+  | Parser.Equal _ | Parser.NotEqual _ | Parser.Less _ | Parser.Greater _
+  | Parser.Comma _ | Parser.Colon _ | Parser.Pipe _ | Parser.Cons _
+  | Parser.Arrow _ | Parser.Underscore _ ->
       dump_tokens lexbuf
 
 let string_of_binop = function
