@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.6.1] - 2026-02-20
+
+### Added
+- Lunno opam versioning file
+
 ## [0.6.0] - 2026-02-20
 
 ### Added

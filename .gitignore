@@ -1,5 +1,4 @@
 # Opam artifacts
-*.opam
 .ocamlformat
 
 # Build artifacts
