@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.6.1)
+(version 0.6.2)
 
 (generate_opam_files true)
 
@@ -36,7 +36,7 @@
   (ounit2
    (and
     :with-test
-    (= 2.2.2.7))))
+    (= 2.2.7))))
  (depopts
   (merlin :dev)
   (ocaml-lsp-server :dev))
