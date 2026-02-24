@@ -1,6 +1,7 @@
 open OUnit2
 open Lunno_frontend
 open Lunno_common.Error
+open Lunno_common.Ast
 
 let parse_expr s =
   let lexbuf = Lexing.from_string s in
@@ -51,7 +52,7 @@ let assert_lexer_error ~ctxt input expected_code =
 
 let check s =
   let prog = parse_program s in
-  Typechecker.check_program prog
+  Typechecker.infer_program prog
 
 let assert_ok ~ctxt:_ s =
   try check s
@@ -559,16 +560,12 @@ let test_function_untyped_params ctxt =
 
 let test_function_typed_params ctxt =
   match parse_expr "let f(x: int, y: int) -> int { x + y }" with
-  | Let
-      {
-        name = "f";
-        let_body = Lambda { params; ret_ty = Some Ast.TyInt; _ };
-        _;
-      } -> (
+  | Let { name = "f"; let_body = Lambda { params; ret_ty = Some TyInt; _ }; _ }
+    -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
+          assert_equal ~ctxt (Some TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some TyInt) p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected typed function"
 
@@ -577,7 +574,7 @@ let test_function_mixed_params ctxt =
   | Let { let_body = Lambda { params; _ }; _ } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some TyInt) p1.param_ty;
           assert_equal ~ctxt None p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with mixed params"
@@ -589,8 +586,8 @@ let test_function_uniform_syntax ctxt =
       | [ p1; p2 ] ->
           assert_equal ~ctxt "x" p1.param_name;
           assert_equal ~ctxt "y" p2.param_name;
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
+          assert_equal ~ctxt (Some TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some TyInt) p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with uniform syntax"
 
@@ -600,9 +597,9 @@ let test_function_mixed_uniform_syntax ctxt =
       assert_equal ~ctxt 3 (List.length params);
       match params with
       | [ p1; p2; p3 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty;
-          assert_equal ~ctxt (Some Ast.TyString) p3.param_ty
+          assert_equal ~ctxt (Some TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some TyInt) p2.param_ty;
+          assert_equal ~ctxt (Some TyString) p3.param_ty
       | _ -> assert_failure "Expected 3 params")
   | _ -> assert_failure "Expected function with mixed uniform syntax"
 
@@ -1404,8 +1401,7 @@ let tc_test_function_return_mismatch ctxt =
     "let f(x: int) -> int { \"hello\" }"
 
 let tc_test_function_missing_annotation ctxt =
-  assert_error ~ctxt ~code:(Some E_Type_MissingAnnotation)
-    "let f(x) -> int { 42 }"
+  assert_ok ~ctxt "let f(x) -> int { 42 }"
 
 let tc_test_function_no_return_annotation ctxt =
   assert_ok ~ctxt "let f(x: int) { x }"
@@ -1557,8 +1553,7 @@ let tc_test_recursive_function ctxt =
      fib(m - 2) } }"
 
 let tc_test_recursive_missing_return_annotation ctxt =
-  assert_error ~ctxt ~code:(Some E_Type_MissingAnnotation)
-    "let f(n: int) { match n { | 0 -> 0 | m -> f(m - 1) } }"
+  assert_ok ~ctxt "let f(n) { match n { | 0 -> 0 | m -> f(m - 1) } }"
 
 let tc_test_nested_recursive_function ctxt =
   assert_ok ~ctxt
@@ -1611,8 +1606,390 @@ let tc_test_primed_name ctxt = assert_ok ~ctxt "let x = 1\nlet x' = 2\nx + x'"
 let tc_test_double_primed_name ctxt =
   assert_ok ~ctxt "let x = 1\nlet x' = 2\nlet x'' = 3\nx + x' + x''"
 
+let tc_poly_identity_int ctxt = assert_ok ~ctxt {|let id(x) { x }
+      id(42)|}
+
+let tc_poly_identity_float ctxt =
+  assert_ok ~ctxt {|let id(x) { x }
+      id(3.14)|}
+
+let tc_poly_identity_string ctxt =
+  assert_ok ~ctxt {|let id(x) { x }
+      id("hello")|}
+
+let tc_poly_identity_bool ctxt =
+  assert_ok ~ctxt {|let id(x) { x }
+      id(true)|}
+
+let tc_poly_identity_two_types ctxt =
+  assert_ok ~ctxt
+    {|let id(x) { x }
+      let a: int    = id(1)
+      let b: string = id("hi")
+      a|}
+
+let tc_poly_identity_three_types ctxt =
+  assert_ok ~ctxt
+    {|let id(x) { x }
+      let a: int    = id(0)
+      let b: float  = id(0.0)
+      let c: bool   = id(false)
+      a|}
+
+let tc_poly_const_int_string ctxt =
+  assert_ok ~ctxt
+    {|let k(x, y) { x }
+      let r: int = k(42, "ignored")
+      r|}
+
+let tc_poly_const_string_int ctxt =
+  assert_ok ~ctxt
+    {|let k(x, y) { x }
+      let r: string = k("hello", 99)
+      r|}
+
+let tc_poly_const_bool_float ctxt =
+  assert_ok ~ctxt
+    {|let k(x, y) { x }
+      let r: bool = k(true, 2.71)
+      r|}
+
+let tc_poly_const_multiple_instantiations ctxt =
+  assert_ok ~ctxt
+    {|let k(x, y) { x }
+      let a: int    = k(1,    "a")
+      let b: string = k("b",  2)
+      let c: bool   = k(true, false)
+      a|}
+
+let tc_poly_apply_int ctxt =
+  assert_ok ~ctxt
+    {|let apply(f: (int) -> int, x: int) -> int { f(x) }
+      let double(x: int) -> int { x * 2 }
+      apply(double, 5)|}
+
+let tc_poly_apply_to_string_fn ctxt =
+  assert_ok ~ctxt
+    {|let apply(f: (string) -> int, s: string) -> int { f(s) }
+      let length_proxy(s: string) -> int { 0 }
+      apply(length_proxy, "hi")|}
+
+let tc_poly_twice ctxt =
+  assert_ok ~ctxt
+    {|let twice(f: (int) -> int, x: int) -> int { f(f(x)) }
+      let succ(n: int) -> int { n + 1 }
+      twice(succ, 0)|}
+
+let tc_poly_length_int_list ctxt =
+  assert_ok ~ctxt
+    {|let length(xs: [int]) -> int {
+        match xs {
+          | []      -> 0
+          | _ :: t  -> 1 + length(t)
+        }
+      }
+      length(1 :: 2 :: 3 :: [])|}
+
+let tc_poly_length_no_annotations ctxt =
+  assert_ok ~ctxt
+    {|let length(xs) {
+        match xs {
+          | []      -> 0
+          | _ :: t  -> 1 + length(t)
+        }
+      }|}
+
+let tc_poly_length_untyped_param ctxt =
+  assert_ok ~ctxt
+    {|let length(xs) -> int {
+        match xs {
+          | []      -> 0
+          | _ :: t  -> 1 + length(t)
+        }
+      }|}
+
+let tc_poly_fib_no_annotations ctxt =
+  assert_ok ~ctxt
+    {|let fib(n) {
+        if n < 2 then n else fib(n - 1) + fib(n - 2)
+      }|}
+
+let tc_poly_length_untyped_called ctxt =
+  assert_ok ~ctxt
+    {|let length(xs) -> int {
+        match xs {
+          | []      -> 0
+          | _ :: t  -> 1 + length(t)
+        }
+      }
+      length([1, 2, 3])|}
+
+let tc_poly_fib_no_annotations_called ctxt =
+  assert_ok ~ctxt
+    {|let fib(n) {
+        if n < 2 then n else fib(n - 1) + fib(n - 2)
+      }
+      fib(10)|}
+
+let tc_poly_max_no_annotations ctxt =
+  assert_ok ~ctxt
+    {|let max(a, b) {
+        if a > b then a else b
+      }
+      max(3, 5)|}
+
+let tc_poly_length_untyped ctxt =
+  assert_ok ~ctxt
+    {|let length(xs) -> int {
+        match xs {
+          | []      -> 0
+          | _ :: t  -> 1 + length(t)
+        }
+      }|}
+
+let tc_poly_head_int ctxt =
+  assert_ok ~ctxt
+    {|let head(xs: [int]) -> int {
+        match xs {
+          | x :: _ -> x
+          | [] -> 0
+        }
+      }
+      head(7 :: [])|}
+
+let tc_poly_list_untyped_param ctxt =
+  assert_ok ~ctxt
+    {|let is_empty(xs) -> bool {
+        match xs {
+          | []    -> true
+          | _ :: _ -> false
+        }
+      }|}
+
+let tc_poly_let_generalization_in_block ctxt =
+  assert_ok ~ctxt
+    {|let f -> int {
+        let id(x) { x }
+        let a: int    = id(1)
+        let b: string = id("two")
+        a
+      }|}
+
+let tc_poly_block_let_multi_use ctxt =
+  assert_ok ~ctxt
+    {|let test -> bool {
+        let id(x) { x }
+        let n: int  = id(42)
+        let s: bool = id(true)
+        s
+      }|}
+
+let tc_poly_two_poly_lets_in_block ctxt =
+  assert_ok ~ctxt
+    {|let outer -> int {
+        let id(x)    { x    }
+        let const(x, y) { x }
+        let a: int    = id(1)
+        let b: string = id("hi")
+        let c: int    = const(10, "drop")
+        let d: bool   = const(false, 99)
+        a
+      }|}
+
+let tc_poly_fib_recursive ctxt =
+  assert_ok ~ctxt
+    {|let fib(n: int) -> int {
+        match n {
+          | 0 -> 0
+          | 1 -> 1
+          | m -> fib(m - 1) + fib(m - 2)
+        }
+      }|}
+
+let tc_poly_shared_poly_helper ctxt =
+  assert_ok ~ctxt
+    {|let id(x) { x }
+      let foo(n: int)    -> int    { id(n) }
+      let bar(s: string) -> string { id(s) }
+      foo(1)|}
+
+let tc_poly_returns_function ctxt =
+  assert_ok ~ctxt
+    {|let add_n(n: int) -> (int) -> int {
+        let adder(x: int) -> int { n + x }
+        adder
+      }
+      let add5 = add_n(5)
+      add5(10)|}
+
+let tc_poly_higher_order_returns ctxt =
+  assert_ok ~ctxt
+    {|let compose(f: (int) -> int, g: (int) -> int) -> (int) -> int {
+        let h(x: int) -> int { f(g(x)) }
+        h
+      }
+      let inc(x: int) -> int { x + 1 }
+      let dbl(x: int) -> int { x * 2 }
+      let inc_then_dbl = compose(dbl, inc)
+      inc_then_dbl(3)|}
+
+let tc_poly_match_variable_bind ctxt =
+  assert_ok ~ctxt
+    {|let first_or_default(xs: [int], default: int) -> int {
+        match xs {
+          | h :: _ -> h
+          | []     -> default
+        }
+      }|}
+
+let tc_poly_match_guard_poly ctxt =
+  assert_ok ~ctxt
+    {|let safe_head(xs: [int]) -> int {
+        match xs {
+          | h :: _ if h > 0 -> h
+          | _ -> 0
+        }
+      }|}
+
+let tc_poly_identity_wrong_annotation ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let id(x) { x }
+      let r: int = id("oops")|}
+
+let tc_poly_apply_wrong_type ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let id_int(x: int) -> int { x }
+      id_int("not an int")|}
+
+let tc_poly_const_annotation_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let k(x, y) { x }
+      let r: int = k("wrong", 42)|}
+
+let tc_poly_recursive_mono ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let f(x: int) -> int { f(x) }
+      f("oops")|}
+
+let tc_poly_primed_name ctxt =
+  assert_ok ~ctxt
+    {|let id(x) { x }
+      let id'(x) { x }
+      let a: int    = id(1)
+      let b: string = id'("hi")
+      a|}
+
+let tc_poly_outer_poly_inner_mono ctxt =
+  assert_ok ~ctxt
+    {|let id(x) { x }
+      let f -> int {
+        let id_int(x: int) -> int { x }
+        id_int(99)
+      }
+      let g: string = id("still works outside")
+      f()|}
+
+let tc_poly_no_shadowing_error ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_AlreadyDefined)
+    {|let id(x) { x }
+      let f -> int {
+        let id(x: int) -> int { x }
+        id(99)
+      }
+      f()|}
+
+let tc_poly_stress_many_instantiations ctxt =
+  assert_ok ~ctxt
+    {|let id(x) { x }
+      let a: int    = id(0)
+      let b: float  = id(0.0)
+      let c: string = id("hello")
+      let d: bool   = id(true)
+      let e: int    = id(a)
+      let f: float  = id(b)
+      let g: string = id(c)
+      let h: bool   = id(d)
+      a|}
+
+let tc_poly_stress_const ctxt =
+  assert_ok ~ctxt
+    {|let k(x, y) { x }
+      let a: int    = k(1,     2.0)
+      let b: float  = k(2.0,   "x")
+      let c: string = k("hi",  true)
+      let d: bool   = k(false, 0)
+      let e: int    = k(a,     b)
+      a|}
+
+let tc_poly_list_literal_empty ctxt =
+  assert_ok ~ctxt {|let xs: [int] = []
+      xs|}
+
+let tc_poly_list_literal_singleton ctxt =
+  assert_ok ~ctxt {|let xs: [int] = [42]
+      xs|}
+
+let tc_poly_list_literal_multi ctxt =
+  assert_ok ~ctxt {|let xs: [int] = [1, 2, 3]
+      xs|}
+
+let tc_poly_list_literal_float ctxt =
+  assert_ok ~ctxt {|let xs: [float] = [1.0, 2.0, 3.0]
+      xs|}
+
+let tc_poly_list_literal_bool ctxt =
+  assert_ok ~ctxt {|let xs: [bool] = [true, false, true]
+      xs|}
+
+let tc_poly_list_literal_string ctxt =
+  assert_ok ~ctxt {|let xs: [string] = ["foo", "bar", "baz"]
+      xs|}
+
+let tc_poly_list_literal_as_arg ctxt =
+  assert_ok ~ctxt
+    {|let head(xs: [int]) -> int {
+        match xs { | x :: _ -> x | [] -> 0 }
+      }
+      head([10, 20, 30])|}
+
+let tc_poly_list_literal_cons_prefix ctxt =
+  assert_ok ~ctxt {|let xs: [int] = 0 :: [1, 2, 3]
+      xs|}
+
+let tc_poly_list_literal_in_match ctxt =
+  assert_ok ~ctxt
+    {|let f(xs: [int]) -> int {
+        match xs {
+          | []      -> 0
+          | x :: _  -> x
+        }
+      }
+      f([99])|}
+
+let tc_poly_list_literal_empty_inferred ctxt =
+  assert_ok ~ctxt
+    {|let f(xs: [int]) -> int {
+        match xs { | [] -> 0 | x :: _ -> x }
+      }
+      f([])|}
+
+let tc_poly_list_literal_length ctxt =
+  assert_ok ~ctxt
+    {|let length(xs: [int]) -> int {
+        match xs { | [] -> 0 | _ :: t -> 1 + length(t) }
+      }
+      length([1, 2, 3, 4, 5])|}
+
+let tc_poly_list_literal_type_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let xs: [int] = [1, 2.0]|}
+
+let tc_poly_list_literal_annotation_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let xs: [string] = [1, 2, 3]|}
+
 let suite =
-  "lunno lexer tests"
+  "lunno tests"
   >::: [
          "[lexer] simple tokens" >:: test_simple_tokens;
          "[lexer] operators" >:: test_operators;
@@ -1879,6 +2256,68 @@ let suite =
          "[tc] function return type" >:: tc_test_function_return_type;
          "[tc] primed name" >:: tc_test_primed_name;
          "[tc] double primed name" >:: tc_test_double_primed_name;
+         "[poly] identity int" >:: tc_poly_identity_int;
+         "[poly] identity float" >:: tc_poly_identity_float;
+         "[poly] identity string" >:: tc_poly_identity_string;
+         "[poly] identity bool" >:: tc_poly_identity_bool;
+         "[poly] identity two types" >:: tc_poly_identity_two_types;
+         "[poly] identity three types" >:: tc_poly_identity_three_types;
+         "[poly] const int string" >:: tc_poly_const_int_string;
+         "[poly] const string int" >:: tc_poly_const_string_int;
+         "[poly] const bool float" >:: tc_poly_const_bool_float;
+         "[poly] const multiple instantiations"
+         >:: tc_poly_const_multiple_instantiations;
+         "[poly] apply int" >:: tc_poly_apply_int;
+         "[poly] apply to string fn" >:: tc_poly_apply_to_string_fn;
+         "[poly] twice" >:: tc_poly_twice;
+         "[poly] length int list" >:: tc_poly_length_int_list;
+         "[poly] length no annotations" >:: tc_poly_length_no_annotations;
+         "[poly] length untyped param" >:: tc_poly_length_untyped_param;
+         "[poly] fib no annotations" >:: tc_poly_fib_no_annotations;
+         "[poly] length untyped called" >:: tc_poly_length_untyped_called;
+         "[poly] fib no annotations called"
+         >:: tc_poly_fib_no_annotations_called;
+         "[poly] max no annotations" >:: tc_poly_max_no_annotations;
+         "[poly] head int" >:: tc_poly_head_int;
+         "[poly] list untyped param" >:: tc_poly_list_untyped_param;
+         "[poly] let generalization in block"
+         >:: tc_poly_let_generalization_in_block;
+         "[poly] block let multi use" >:: tc_poly_block_let_multi_use;
+         "[poly] two poly lets in block" >:: tc_poly_two_poly_lets_in_block;
+         "[poly] fib recursive" >:: tc_poly_fib_recursive;
+         "[poly] shared poly helper" >:: tc_poly_shared_poly_helper;
+         "[poly] returns function" >:: tc_poly_returns_function;
+         "[poly] higher order returns" >:: tc_poly_higher_order_returns;
+         "[poly] match variable bind" >:: tc_poly_match_variable_bind;
+         "[poly] match guard poly" >:: tc_poly_match_guard_poly;
+         "[poly] identity wrong annotation"
+         >:: tc_poly_identity_wrong_annotation;
+         "[poly] apply wrong type" >:: tc_poly_apply_wrong_type;
+         "[poly] const annotation mismatch"
+         >:: tc_poly_const_annotation_mismatch;
+         "[poly] recursive mono" >:: tc_poly_recursive_mono;
+         "[poly] primed name" >:: tc_poly_primed_name;
+         "[poly] outer poly inner mono" >:: tc_poly_outer_poly_inner_mono;
+         "[poly] no shadowing error" >:: tc_poly_no_shadowing_error;
+         "[poly] stress many instantiations"
+         >:: tc_poly_stress_many_instantiations;
+         "[poly] stress const" >:: tc_poly_stress_const;
+         "[poly] list literal empty" >:: tc_poly_list_literal_empty;
+         "[poly] list literal singleton" >:: tc_poly_list_literal_singleton;
+         "[poly] list literal multi" >:: tc_poly_list_literal_multi;
+         "[poly] list literal float" >:: tc_poly_list_literal_float;
+         "[poly] list literal bool" >:: tc_poly_list_literal_bool;
+         "[poly] list literal string" >:: tc_poly_list_literal_string;
+         "[poly] list literal as arg" >:: tc_poly_list_literal_as_arg;
+         "[poly] list literal cons prefix" >:: tc_poly_list_literal_cons_prefix;
+         "[poly] list literal in match" >:: tc_poly_list_literal_in_match;
+         "[poly] list literal empty inferred"
+         >:: tc_poly_list_literal_empty_inferred;
+         "[poly] list literal length" >:: tc_poly_list_literal_length;
+         "[poly] list literal type mismatch"
+         >:: tc_poly_list_literal_type_mismatch;
+         "[poly] list literal annotation mismatch"
+         >:: tc_poly_list_literal_annotation_mismatch;
        ]
 
 let () = run_test_tt_main suite

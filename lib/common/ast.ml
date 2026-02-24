@@ -1,5 +1,3 @@
-open Lunno_common
-
 type ty =
   | TyInt
   | TyFloat
@@ -7,8 +5,12 @@ type ty =
   | TyBool
   | TyUnit
   | TyVar of string
+  | TyMeta of meta_var
   | TyList of ty
   | TyFunction of ty list * ty
+  | TyModule of string * string
+
+and meta_var = { id : int; contents : ty option ref }
 
 type literal =
   | LInt of int64
@@ -16,6 +18,7 @@ type literal =
   | LString of string
   | LBool of bool
   | LUnit
+  | LNil
 
 type param = { param_name : string; param_ty : ty option; param_span : Span.t }
 type import = { module_ : string; item : string; import_span : Span.t }
@@ -31,6 +34,7 @@ type expr =
   | Block of expr list * Span.t
   | Binary of binary_expr
   | Unary of unary_expr
+  | MemberAccess of expr * string * Span.t
 
 and lambda = {
   params : param list;
@@ -111,5 +115,6 @@ let span_of_expr = function
   | Let { let_span = s; _ } -> s
   | If { if_span = s; _ } -> s
   | Match { match_span = s; _ } -> s
+  | MemberAccess (_, _, s) -> s
 
 type program = { imports : import list; body : expr list }

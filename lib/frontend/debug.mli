@@ -9,7 +9,7 @@ val dump_tokens : Lexing.lexbuf -> unit
     @param lexbuf The lexing buffer containing the input source code.
     @return Unit. *)
 
-val dump_program : Ast.program -> unit
+val dump_program : Lunno_common.Ast.program -> unit
 (** [dump_program prog] prints the structure of the entire AST program [prog].
 
     This function iterates over all top-level expressions in the program and
@@ -18,7 +18,7 @@ val dump_program : Ast.program -> unit
     @param prog The AST program to dump.
     @return Unit. *)
 
-val string_of_ty : Ast.ty -> string
+val string_of_ty : Lunno_common.Ast.ty -> string
 (** [string_of_ty ty] returns a human-readable string representation of the type
     [ty].
 

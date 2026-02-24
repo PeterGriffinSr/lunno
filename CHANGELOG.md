@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.7.0] - 2026-02-23
+
+### Added
+- HM-style type inference with `generalize` and `instantiate`, enabling let-polymorphism throughout the language.
+- List literal syntax `[e1, e2, ...]`, desugaring to right-associative `::` chains terminated by `Nil`.
+- `LNil` literal variant in the AST, inferred as `[?a]` (a fresh list of an unconstrained element type).
+- Data-driven module system via `Registry`, with `import "namespace:item"` syntax and TyModule type.
+- `MemberAccess` expression form (`module.member`) for accessing exported module members.
+- Polymorphism test suite with 50 tests covering identity, K combinator, higher-order functions, let-generalization in blocks, unannotated recursive functions, list literals, and error cases.
+
+### Changed
+- Updated file/directory structure to reflect the module system and frontend/common/modules split.
+- Recursive `let` bindings no longer require full type annotations — unannotated params and missing return types are now inferred via `fresh_meta ()` rather than raising MissingAnnotation.
+- `infer_literal` extended to handle `LNil`.
+
+### Fixed
+- `unify` spuriously raised a type mismatch when unifying a metavariable with itself (`?n` vs `?n`), caused by the occurs check returning true on equal IDs. Fixed by adding a `TyMeta m, TyMeta m2 when m.id = m2.id -> ()` guard before the occurs check.
+
 ## [0.6.3] - 2026-02-20
 
 ### Changed

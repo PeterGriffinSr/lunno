@@ -1,5 +1,5 @@
 %{
-    open Ast
+    open Lunno_common.Ast
 
     let rec contains_variable name expr =
         match expr with
@@ -25,6 +25,7 @@
         | Binary { left; right; _ } ->
             contains_variable name left || contains_variable name right
         | Unary { expr; _ } -> contains_variable name expr
+        | MemberAccess (obj, _, _) -> contains_variable name obj
 
     let merge e1 e2 =
         let span_of = function
@@ -40,6 +41,7 @@
                     | If { if_span; _ } -> if_span
                     | Match { match_span; _ } -> match_span
                     | Unary { unary_span; _ } -> unary_span
+                    | MemberAccess (_, _, span) -> span
                 end
             | `Span sp -> sp
             | `Pattern p ->
@@ -57,6 +59,12 @@
         let sp1 = span_of e1 in
         let sp2 = span_of e2 in
         (fst sp1, snd sp2)
+
+    let desugar_list close_span elems =
+        List.fold_right (fun elem acc -> 
+        Binary { binary_op = OpCons; left = elem; right = acc; binary_span = merge (`Expr elem) (`Expr acc) })
+    elems
+    (Literal (LNil, close_span))
 %}
 
 %token <int64 * Lunno_common.Span.t> Integer
@@ -70,7 +78,7 @@
 %token <Lunno_common.Span.t> IntegerType FloatingPointType StringType BooleanType UnitType
 %token <Lunno_common.Span.t> LeftParen RightParen LeftBrace RightBrace LeftBracket RightBracket
 %token <Lunno_common.Span.t> Plus Minus Asterisk Slash Equal NotEqual Less Greater
-%token <Lunno_common.Span.t> Comma Colon Pipe Cons Arrow Underscore
+%token <Lunno_common.Span.t> Comma Colon Pipe Cons Arrow Underscore Dot
 %token <Lunno_common.Span.t> EndOfFile
 
 %nonassoc THEN
@@ -79,14 +87,14 @@
 %on_error_reduce call_expr
 
 %start program
-%type <Ast.program> program
-%type <Ast.ty> type_expr type_primary ret_type ret_type_primary param_type
-%type <Ast.ty list> type_expr_list ret_type_list
-%type <Ast.pattern> pattern cons_pattern primary_pattern
-%type <Ast.match_case> match_case
-%type <Ast.match_case list> match_cases
-%type <Ast.import> import
-%type <Ast.import list> import_list
+%type <Lunno_common.Ast.program> program
+%type <Lunno_common.Ast.ty> type_expr type_primary ret_type ret_type_primary param_type
+%type <Lunno_common.Ast.ty list> type_expr_list ret_type_list
+%type <Lunno_common.Ast.pattern> pattern cons_pattern primary_pattern
+%type <Lunno_common.Ast.match_case> match_case
+%type <Lunno_common.Ast.match_case list> match_cases
+%type <Lunno_common.Ast.import> import
+%type <Lunno_common.Ast.import list> import_list
 
 %%
 
@@ -143,6 +151,13 @@ multiplicative_expr:
 call_expr:
     | call_expr LeftParen RightParen { Apply ($1, [], merge (`Expr $1) (`Span $3)) }
     | call_expr LeftParen arg_list RightParen { Apply ($1, $3, merge (`Expr $1) (`Span $4)) }
+    | member_expr { $1 }
+
+member_expr:
+    | member_expr Dot Identifier { 
+        let (name, span) = $3 in 
+        MemberAccess ($1, name, merge (`Expr $1) (`Span span)) 
+      }
     | primary_expr { $1 }
 
 primary_expr:
@@ -154,6 +169,8 @@ primary_expr:
     | Identifier { let (name, span) = $1 in Variable (name, span) }
     | LeftParen RightParen { Literal (LUnit, merge (`Span $1) (`Span $2)) }
     | LeftParen expr RightParen { $2 }
+    | LeftBracket RightBracket { Literal (LNil, merge (`Span $1) (`Span $2)) }
+    | LeftBracket arg_list RightBracket { desugar_list $3 $2 }
     | block_expr { $1 }
 
 if_expr:

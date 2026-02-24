@@ -10,6 +10,7 @@ type error_code =
   | E_Lex_NewlineInString  (** Newline encountered inside a string literal. *)
   | E_Lex_EmptyString  (** Empty string literals are not allowed. *)
   | E_Parse_UnexpectedToken
+      (** Encountered an unexpected token during parsing. *)
   | E_Type_AlreadyDefined
       (** A name was defined more than once in the same scope. *)
   | E_Type_UndefinedVariable
@@ -37,7 +38,13 @@ exception
   }
 (** Exception raised by the lexer on lexical errors. *)
 
-exception ParseError of { code : error_code; msg : string; span : Span.t }
+exception
+  ParseError of {
+    code : error_code;  (** The kind of syntax error. *)
+    msg : string;  (** A human-readable error message. *)
+    span : Span.t;  (** Span in the source where the error occurred. *)
+  }
+(** Exception raised by the parser on syntax errors. *)
 
 exception
   TypeError of {

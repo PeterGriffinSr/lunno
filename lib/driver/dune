@@ -1,7 +1,7 @@
 (library
  (name lunno_driver)
  (public_name lunno.driver)
- (libraries lunno.frontend lunno.common))
+ (libraries lunno.frontend lunno.common toml))
 
 (rule
  (target version.ml)

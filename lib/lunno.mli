@@ -1,7 +1,7 @@
 module Debug = Lunno_frontend.Debug
 module Flags = Lunno_driver.Flags
 
-val parse_string : string -> Lunno_frontend.Ast.program
+val parse_string : string -> Lunno_common.Ast.program
 (** [parse_string s] parses the input string [s] and returns the resulting AST
     program.
 
@@ -12,7 +12,7 @@ val parse_string : string -> Lunno_frontend.Ast.program
     @raise Error.ParserError
       Raised if a syntax error is encountered during parsing. *)
 
-val parse_file : string -> string array * Lunno_frontend.Ast.program
+val parse_file : string -> string array * Lunno_common.Ast.program
 (** [parse_file filename] reads the contents of the file [filename], parses it,
     and returns the resulting AST program.
 
@@ -23,7 +23,7 @@ val parse_file : string -> string array * Lunno_frontend.Ast.program
     @raise Error.ParserError
       Raised if a syntax error is encountered during parsing. *)
 
-val typecheck_program : string array -> Lunno_frontend.Ast.program -> unit
+val typecheck_program : string array -> Lunno_common.Ast.program -> unit
 (** [typecheck_program lines program] typechecks [program], printing a type
     error and exiting if one is found.
 

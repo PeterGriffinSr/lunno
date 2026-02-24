@@ -1,6 +1,6 @@
-val check_program : Ast.program -> unit
-(** [check_program program] typechecks the given program, raising on the first
-    error encountered.
+val infer_program : Lunno_common.Ast.program -> unit
+(** [infer_program program] infers types for the given program, raising on the
+    first error encountered.
 
-    @param program The AST program to typecheck.
+    @param program The AST program to infer types for.
     @raise Error.TypeError Raised if a type error is encountered. *)

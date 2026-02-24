@@ -1,0 +1,7 @@
+(include_subdirs qualified)
+
+(library
+ (name lunno_modules)
+ (public_name lunno.modules)
+ (wrapped true)
+ (libraries lunno_common))

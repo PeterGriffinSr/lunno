@@ -36,4 +36,5 @@ let to_string = function
   | Parser.Cons _ -> "Cons"
   | Parser.Arrow _ -> "Arrow"
   | Parser.Underscore _ -> "Underscore"
+  | Parser.Dot _ -> "Dot"
   | Parser.EndOfFile _ -> "EOF"

@@ -52,7 +52,7 @@ let parse lexbuf lines =
     exit 1
 
 let typecheck program lines =
-  try Typechecker.check_program program
+  try Typechecker.infer_program program
   with Error.TypeError _ as e ->
     Error.print_error lines e;
     exit 1

@@ -61,6 +61,7 @@ rule token = parse
     | ":" { with_pos lexbuf (fun span -> Colon span) }
     | "|" { with_pos lexbuf (fun span -> Pipe span) }
     | "_" { with_pos lexbuf (fun span -> Underscore span) }
+    | "." { with_pos lexbuf (fun span -> Dot span) }
     | float_literal as f {
         with_pos lexbuf (fun span ->
             try FloatingPoint (float_of_string (strip_underscores f), span)

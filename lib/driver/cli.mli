@@ -3,7 +3,7 @@ val read_file_lines : string -> string array
     returns them as a string array. The file is safely closed even if an
     exception occurs. *)
 
-val parse : Lexing.lexbuf -> string array -> Lunno_frontend.Ast.program
+val parse : Lexing.lexbuf -> string array -> Lunno_common.Ast.program
 (** [parse lexbuf lines] parses the input from [lexbuf] and returns the
     resulting AST program.
 
@@ -13,7 +13,7 @@ val parse : Lexing.lexbuf -> string array -> Lunno_frontend.Ast.program
       [1] if a [LexerError] or [ParserError] is raised, printing a formatted
       error message. *)
 
-val typecheck : Lunno_frontend.Ast.program -> string array -> unit
+val typecheck : Lunno_common.Ast.program -> string array -> unit
 (** [typecheck program lines] typechecks [program] and returns [unit] on
     success.
 

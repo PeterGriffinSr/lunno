@@ -1,4 +1,6 @@
-open Ast
+[@@@warning "-45"]
+
+open Lunno_common.Ast
 
 let rec dump_tokens lexbuf =
   let token = Lexer.token lexbuf in
@@ -15,7 +17,7 @@ let rec dump_tokens lexbuf =
   | Parser.Plus _ | Parser.Minus _ | Parser.Asterisk _ | Parser.Slash _
   | Parser.Equal _ | Parser.NotEqual _ | Parser.Less _ | Parser.Greater _
   | Parser.Comma _ | Parser.Colon _ | Parser.Pipe _ | Parser.Cons _
-  | Parser.Arrow _ | Parser.Underscore _ ->
+  | Parser.Arrow _ | Parser.Underscore _ | Parser.Dot _ ->
       dump_tokens lexbuf
 
 let string_of_binop = function
@@ -46,7 +48,8 @@ let rec dump_expr ?(indent = 0) e =
       | LFloat f -> Printf.printf "%sFloat(%g) %s\n" pad f (string_of_span sp)
       | LString s -> Printf.printf "%sString(%S) %s\n" pad s (string_of_span sp)
       | LBool b -> Printf.printf "%sBool(%b) %s\n" pad b (string_of_span sp)
-      | LUnit -> Printf.printf "%sUnit %s\n" pad (string_of_span sp))
+      | LUnit -> Printf.printf "%sUnit %s\n" pad (string_of_span sp)
+      | LNil -> Printf.printf "%sNil %s\n" pad (string_of_span sp))
   | Variable (name, sp) ->
       Printf.printf "%sVar(%s) %s\n" pad name (string_of_span sp)
   | Binary { binary_op; left; right; binary_span } ->
@@ -70,12 +73,12 @@ let rec dump_expr ?(indent = 0) e =
           (List.map
              (fun (p : param) ->
                match p.param_ty with
-               | None -> p.param_name
+               | None -> Printf.sprintf "%s: ?" p.param_name
                | Some t -> Printf.sprintf "%s: %s" p.param_name (string_of_ty t))
              params)
       in
       let ret_str =
-        match ret_ty with None -> "Infer" | Some t -> string_of_ty t
+        match ret_ty with None -> "?" | Some t -> string_of_ty t
       in
       let rec_str = if is_recursive then " [recursive]" else "" in
       (match (params, ret_ty) with
@@ -126,7 +129,7 @@ let rec dump_expr ?(indent = 0) e =
               dump_expr ~indent:(indent + 4) arg)
             args
       | Lambda _ | Apply _ | Let _ | If _ | Match _ | Block _ | Binary _
-      | Unary _ | Literal _ ->
+      | Unary _ | Literal _ | MemberAccess _ ->
           Printf.printf "%sApply %s\n" pad (string_of_span span);
           Printf.printf "%s  Function:\n" pad;
           dump_expr ~indent:(indent + 4) f;
@@ -136,6 +139,10 @@ let rec dump_expr ?(indent = 0) e =
               Printf.printf "%s    [%d]:\n" pad i;
               dump_expr ~indent:(indent + 6) arg)
             args)
+  | MemberAccess (obj, member, span) ->
+      Printf.printf "%sMemberAccess(.%s) %s\n" pad member (string_of_span span);
+      Printf.printf "%s  Object:\n" pad;
+      dump_expr ~indent:(indent + 4) obj
 
 and dump_pattern ?(indent = 0) = function
   | PWildcard sp ->
@@ -172,6 +179,11 @@ and string_of_ty = function
   | TyBool -> "bool"
   | TyUnit -> "unit"
   | TyVar v -> v
+  | TyMeta mv -> (
+      match !(mv.contents) with
+      | None -> Printf.sprintf "?%d" mv.id
+      | Some t -> string_of_ty t)
+  | TyModule (namespace, name) -> namespace ^ ":" ^ name
   | TyList t -> Printf.sprintf "List[%s]" (string_of_ty t)
   | TyFunction (args, ret) ->
       Printf.sprintf "Fun(%s -> %s)"
@@ -191,19 +203,17 @@ and get_let_type_string ty body =
                    match p.param_ty with
                    | Some t ->
                        Printf.sprintf "%s: %s" p.param_name (string_of_ty t)
-                   | None -> Printf.sprintf "%s: Infer" p.param_name)
+                   | None -> Printf.sprintf "%s: ?" p.param_name)
                  lambda.params)
           in
           let ret_str =
-            match lambda.ret_ty with
-            | Some t -> string_of_ty t
-            | None -> "Infer"
+            match lambda.ret_ty with Some t -> string_of_ty t | None -> "?"
           in
           if lambda.params = [] then ret_str
           else Printf.sprintf "Fun(%s -> %s)" params_str ret_str
       | Literal _ | Variable _ | Apply _ | Let _ | If _ | Match _ | Block _
-      | Binary _ | Unary _ ->
-          "Infer")
+      | Binary _ | Unary _ | MemberAccess _ ->
+          "?")
 
 let dump_import imp =
   Printf.printf "Import(\"%s:%s\") %s\n" imp.module_ imp.item
