@@ -1,7 +1,7 @@
 open OUnit2
 open Lunno_frontend
-open Lunno_common.Error
-open Lunno_common.Ast
+open Lunno_lower
+open Lunno_common
 
 let parse_expr s =
   let lexbuf = Lexing.from_string s in
@@ -47,16 +47,17 @@ let assert_lexer_error ~ctxt input expected_code =
   try
     let _ = lex_exn input in
     assert_failure "Expected LexerError, but none was raised"
-  with LexerError e ->
-    assert_equal ~ctxt ~printer:string_of_code expected_code e.code
+  with Error.LexerError e ->
+    assert_equal ~ctxt ~printer:Error.string_of_code expected_code e.code
 
 let check s =
   let prog = parse_program s in
-  Typechecker.infer_program prog
+  let _ = Typechecker.infer_program prog in
+  ()
 
 let assert_ok ~ctxt:_ s =
   try check s
-  with TypeError { msg; _ } ->
+  with Error.TypeError { msg; _ } ->
     assert_failure
       (Printf.sprintf "Expected OK but got type error: %s\nInput: %s" msg s)
 
@@ -560,12 +561,16 @@ let test_function_untyped_params ctxt =
 
 let test_function_typed_params ctxt =
   match parse_expr "let f(x: int, y: int) -> int { x + y }" with
-  | Let { name = "f"; let_body = Lambda { params; ret_ty = Some TyInt; _ }; _ }
-    -> (
+  | Let
+      {
+        name = "f";
+        let_body = Lambda { params; ret_ty = Some Ast.TyInt; _ };
+        _;
+      } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some TyInt) p2.param_ty
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected typed function"
 
@@ -574,7 +579,7 @@ let test_function_mixed_params ctxt =
   | Let { let_body = Lambda { params; _ }; _ } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
           assert_equal ~ctxt None p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with mixed params"
@@ -586,8 +591,8 @@ let test_function_uniform_syntax ctxt =
       | [ p1; p2 ] ->
           assert_equal ~ctxt "x" p1.param_name;
           assert_equal ~ctxt "y" p2.param_name;
-          assert_equal ~ctxt (Some TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some TyInt) p2.param_ty
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with uniform syntax"
 
@@ -597,9 +602,9 @@ let test_function_mixed_uniform_syntax ctxt =
       assert_equal ~ctxt 3 (List.length params);
       match params with
       | [ p1; p2; p3 ] ->
-          assert_equal ~ctxt (Some TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some TyInt) p2.param_ty;
-          assert_equal ~ctxt (Some TyString) p3.param_ty
+          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty;
+          assert_equal ~ctxt (Some Ast.TyString) p3.param_ty
       | _ -> assert_failure "Expected 3 params")
   | _ -> assert_failure "Expected function with mixed uniform syntax"
 
@@ -1352,7 +1357,7 @@ let assert_error ~ctxt:_ ?(code = None) s =
     check s;
     assert_failure
       (Printf.sprintf "Expected type error but got none\nInput: %s" s)
-  with TypeError { code = actual_code; _ } -> (
+  with Error.TypeError { code = actual_code; _ } -> (
     match code with
     | Some expected -> assert_equal expected actual_code
     | None -> ())

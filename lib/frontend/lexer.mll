@@ -1,6 +1,7 @@
 {
     open Parser
-    open Lunno_common.Error
+    open Lunno_common
+    
     let string_buffer = Buffer.create 64
     let reserved = 
         Hashtbl.of_seq (List.to_seq [
@@ -62,20 +63,21 @@ rule token = parse
     | "|" { with_pos lexbuf (fun span -> Pipe span) }
     | "_" { with_pos lexbuf (fun span -> Underscore span) }
     | "." { with_pos lexbuf (fun span -> Dot span) }
+    | ".." { with_pos lexbuf (fun span -> DotDot span) }
     | float_literal as f {
         with_pos lexbuf (fun span ->
             try FloatingPoint (float_of_string (strip_underscores f), span)
             with Failure _ ->
-                raise (LexerError {
-                    code = E_Lex_InvalidFloat;
+                raise (Error.LexerError {
+                    code = Error.E_Lex_InvalidFloat;
                     msg  = "Invalid floating-point literal";
                     span = span;
                 }))
     }
     | digits '_' ([^'0'-'9'] | eof) {
         with_pos lexbuf (fun span ->
-            raise (LexerError {
-                code = E_Lex_InvalidInt;
+            raise (Error.LexerError {
+                code = Error.E_Lex_InvalidInt;
                 msg = "Trailing underscore in integer literal";
                 span;
             }))
@@ -84,8 +86,8 @@ rule token = parse
         with_pos lexbuf (fun span ->
             try Integer (Int64.of_string (strip_underscores i), span)
             with Failure _ ->
-                raise (LexerError {
-                    code = E_Lex_InvalidInt;
+                raise (Error.LexerError {
+                    code = Error.E_Lex_InvalidInt;
                     msg  = "Invalid integer literal";
                     span = span;
                 }))
@@ -104,8 +106,8 @@ rule token = parse
         EndOfFile (pos, pos) }
     | _ as c {
         with_pos lexbuf (fun span ->
-            raise (LexerError {
-                code = E_Lex_UnexpectedChar;
+            raise (Error.LexerError {
+                code = Error.E_Lex_UnexpectedChar;
                 msg  = Printf.sprintf "Unexpected character: %S" (String.make 1 c);
                 span = span;
             }))
@@ -115,8 +117,8 @@ and read_string buffer start_pos = parse
         with_pos lexbuf (fun end_span ->
             let s = Buffer.contents buffer in
             if String.length s = 0 then 
-                raise (LexerError {
-                    code = E_Lex_EmptyString;
+                raise (Error.LexerError {
+                    code = Error.E_Lex_EmptyString;
                     msg  = "Empty string literals are not allowed";
                     span = (start_pos, snd end_span);
                 })
@@ -137,22 +139,22 @@ and read_string buffer start_pos = parse
         read_string buffer start_pos lexbuf
     }
     | '\\' (_ as c) {
-      raise (LexerError {
-        code = E_Lex_InvalidEscape;
+      raise (Error.LexerError {
+        code = Error.E_Lex_InvalidEscape;
         msg  = Printf.sprintf "Invalid escape sequence in string literal '\\%c'" c;
         span = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf);
       })
     }
     | '\n' {  
-        raise (LexerError {
-            code = E_Lex_NewlineInString;
+        raise (Error.LexerError {
+            code = Error.E_Lex_NewlineInString;
             msg  = "Newline in string literal";
             span = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf);
         }) 
     }
     | eof { 
-        raise (LexerError {
-            code = E_Lex_UnterminatedString;
+        raise (Error.LexerError {
+            code = Error.E_Lex_UnterminatedString;
             msg  = "Unterminated string literal";
             span = (start_pos, Lexing.lexeme_end_p lexbuf);
         })

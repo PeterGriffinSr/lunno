@@ -1,6 +1,6 @@
-open Lunno_common.Ast
+open Lunno_common
 
-type module_info = { exports : (string * ty) list }
+type module_info = { exports : (string * Ast.ty) list }
 
 let table : (string, (string, module_info) Hashtbl.t) Hashtbl.t =
   Hashtbl.create 8

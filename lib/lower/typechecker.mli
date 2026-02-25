@@ -1,4 +1,4 @@
-val infer_program : Lunno_common.Ast.program -> unit
+val infer_program : Lunno_common.Ast.program -> Lunno_common.Typed_ast.program
 (** [infer_program program] infers types for the given program, raising on the
     first error encountered.
 

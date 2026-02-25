@@ -1,4 +1,4 @@
-import "std:io"
+import "core:io"
 
 let fib(n) {
     let fib_aux(m, a, b) {

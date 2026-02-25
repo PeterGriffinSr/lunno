@@ -13,9 +13,10 @@ val parse : Lexing.lexbuf -> string array -> Lunno_common.Ast.program
       [1] if a [LexerError] or [ParserError] is raised, printing a formatted
       error message. *)
 
-val typecheck : Lunno_common.Ast.program -> string array -> unit
-(** [typecheck program lines] typechecks [program] and returns [unit] on
-    success.
+val typecheck :
+  Lunno_common.Ast.program -> string array -> Lunno_common.Typed_ast.program
+(** [typecheck program lines] typechecks [program] and returns the resulting
+    typed AST program on success.
 
     @param program The AST program to typecheck.
     @param lines

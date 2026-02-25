@@ -1,0 +1,4 @@
+(library
+ (name lunno_debug)
+ (public_name lunno.debug)
+ (libraries lunno.common))

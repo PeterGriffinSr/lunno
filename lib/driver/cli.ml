@@ -1,4 +1,5 @@
 open Lunno_frontend
+open Lunno_lower
 open Lunno_common
 
 let read_file_lines filename =

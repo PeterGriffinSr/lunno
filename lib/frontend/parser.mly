@@ -26,6 +26,7 @@
             contains_variable name left || contains_variable name right
         | Unary { expr; _ } -> contains_variable name expr
         | MemberAccess (obj, _, _) -> contains_variable name obj
+        | Range (e1, e2, _) -> contains_variable name e1 || contains_variable name e2
 
     let merge e1 e2 =
         let span_of = function
@@ -42,6 +43,7 @@
                     | Match { match_span; _ } -> match_span
                     | Unary { unary_span; _ } -> unary_span
                     | MemberAccess (_, _, span) -> span
+                    | Range (_, _, span) -> span
                 end
             | `Span sp -> sp
             | `Pattern p ->
@@ -78,7 +80,7 @@
 %token <Lunno_common.Span.t> IntegerType FloatingPointType StringType BooleanType UnitType
 %token <Lunno_common.Span.t> LeftParen RightParen LeftBrace RightBrace LeftBracket RightBracket
 %token <Lunno_common.Span.t> Plus Minus Asterisk Slash Equal NotEqual Less Greater
-%token <Lunno_common.Span.t> Comma Colon Pipe Cons Arrow Underscore Dot
+%token <Lunno_common.Span.t> Comma Colon Pipe Cons Arrow Underscore Dot DotDot
 %token <Lunno_common.Span.t> EndOfFile
 
 %nonassoc THEN
@@ -128,10 +130,10 @@ expr:
     | comparison_expr { $1 }
 
 comparison_expr:
-    | comparison_expr Equal additive_expr { Binary { binary_op = OpEqual;    left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr Equal additive_expr { Binary { binary_op = OpEqual; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
     | comparison_expr NotEqual additive_expr { Binary { binary_op = OpNotEqual; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
-    | comparison_expr Less additive_expr { Binary { binary_op = OpLess;     left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
-    | comparison_expr Greater additive_expr { Binary { binary_op = OpGreater;  left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr Less additive_expr { Binary { binary_op = OpLess; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
+    | comparison_expr Greater additive_expr { Binary { binary_op = OpGreater; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
     | cons_expr { $1 }
 
 cons_expr:
@@ -169,6 +171,7 @@ primary_expr:
     | Identifier { let (name, span) = $1 in Variable (name, span) }
     | LeftParen RightParen { Literal (LUnit, merge (`Span $1) (`Span $2)) }
     | LeftParen expr RightParen { $2 }
+    | LeftBracket expr DotDot expr RightBracket { Range ($2, $4, merge (`Span $1) (`Span $5)) }
     | LeftBracket RightBracket { Literal (LNil, merge (`Span $1) (`Span $2)) }
     | LeftBracket arg_list RightBracket { desugar_list $3 $2 }
     | block_expr { $1 }
@@ -261,8 +264,8 @@ let_expr:
       }
 
 ret_type:
-    | ret_type_primary                                  { $1 }
-    | ret_type_primary Arrow ret_type                   { TyFunction ([$1], $3) }
+    | ret_type_primary { $1 }
+    | ret_type_primary Arrow ret_type { TyFunction ([$1], $3) }
     | LeftParen ret_type_list RightParen Arrow ret_type { TyFunction ($2, $5) }
 
 ret_type_primary:
@@ -276,7 +279,7 @@ ret_type_primary:
     | LeftParen ret_type RightParen { $2 }
 
 ret_type_list:
-    | ret_type Comma ret_type      { [$1; $3] }
+    | ret_type Comma ret_type { [$1; $3] }
     | ret_type Comma ret_type_list { $1 :: $3 }
 
 type_expr:

@@ -35,6 +35,7 @@ type expr =
   | Binary of binary_expr
   | Unary of unary_expr
   | MemberAccess of expr * string * Span.t
+  | Range of expr * expr * Span.t
 
 and lambda = {
   params : param list;
@@ -116,5 +117,6 @@ let span_of_expr = function
   | If { if_span = s; _ } -> s
   | Match { match_span = s; _ } -> s
   | MemberAccess (_, _, s) -> s
+  | Range (_, _, s) -> s
 
 type program = { imports : import list; body : expr list }

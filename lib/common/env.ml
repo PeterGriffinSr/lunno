@@ -1,4 +1,4 @@
-open Lunno_common.Ast
+open Ast
 module StringMap = Map.Make (String)
 
 type t = ty StringMap.t

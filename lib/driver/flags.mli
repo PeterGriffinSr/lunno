@@ -1,8 +1,10 @@
-type t = { dump_program : bool; files : string list }
-(** The parsed CLI flags and positional arguments.
-
-    - [dump_program] — whether [--dump-program] was passed
-    - [files] — the list of input source file paths *)
+type t = {
+  dump_program : bool;  (** Whether to print the AST and exit. *)
+  files : string list;
+      (** The list of input files to process. Should contain exactly one file.
+      *)
+}
+(** The parsed CLI flags and positional arguments. *)
 
 val parse : string array -> t
 (** [parse argv] parses [argv] (i.e. [Sys.argv]) into a [t].

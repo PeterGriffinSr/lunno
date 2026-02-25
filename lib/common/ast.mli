@@ -51,6 +51,8 @@ type expr =
   | Binary of binary_expr  (** Binary operation. *)
   | Unary of unary_expr  (** Unary operation. *)
   | MemberAccess of expr * string * Span.t
+      (** Member access, e.g., obj.field. *)
+  | Range of expr * expr * Span.t  (** Range expression, e.g., [1..10]. *)
 
 and lambda = {
   params : param list;  (** Parameters. *)

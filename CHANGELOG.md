@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+### [0.8.0] - 2026-02-25
+
+### Added
+- `Typed_ast` module in `lunno.common`- a fully type-annotated AST where every
+  node carries its resolved type, eliminating `option` and unresolved meta
+  variables after typechecking.
+- `Ty_utils` module in `lunno.common` exposing `string_of_ty`, `string_of_binop`,
+  `string_of_unop`, and `string_of_span`, decoupling type pretty-printing from
+  the debug printer.
+- Range expression syntax `[a..b]` with `DotDot` lexer token, parsed as
+  `Range of expr * expr * Span.t` and typechecked to `List[int]`.
+
+### Changed
+- Typechecker (`lunno.lower`) now produces `Typed_ast.program` instead of `unit`,
+  making inferred types available to all downstream passes.
+- Debug printer (`lunno.debug`) updated to consume `Typed_ast` - all nodes now
+  display their resolved types with no `?` placeholders.
+- `string_of_ty` for zero-argument functions now prints `Fun(unit)` instead of
+  `Fun( -> unit)`.
+- Renamed `lunno.analysis` to `lunno.debug` to better reflect its purpose.
+- Renamed `lunno.middle` to `lunno.lower` to signal its role as the lowering
+  pipeline (typechecking and future IR passes).
+- `lunno.debug` and `lunno.lower` now depend on `Ty_utils` from `lunno.common`
+  rather than reaching across library boundaries for type formatting.
+- Updated `cli.mli` to reflect `typecheck` returning `Typed_ast.program`.
+
 ## [0.7.1] - 2026-02-23
 
 ### Removed

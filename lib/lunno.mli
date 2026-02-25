@@ -1,4 +1,4 @@
-module Debug = Lunno_frontend.Debug
+module Debug = Lunno_debug.Debug
 module Flags = Lunno_driver.Flags
 
 val parse_string : string -> Lunno_common.Ast.program
@@ -23,7 +23,8 @@ val parse_file : string -> string array * Lunno_common.Ast.program
     @raise Error.ParserError
       Raised if a syntax error is encountered during parsing. *)
 
-val typecheck_program : string array -> Lunno_common.Ast.program -> unit
+val typecheck_program :
+  string array -> Lunno_common.Ast.program -> Lunno_common.Typed_ast.program
 (** [typecheck_program lines program] typechecks [program], printing a type
     error and exiting if one is found.
 
