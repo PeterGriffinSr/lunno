@@ -75,9 +75,10 @@
 %token <string * Lunno_common.Span.t> String
 %token <bool * Lunno_common.Span.t> Boolean
 %token <unit * Lunno_common.Span.t> Unit
+%token <char * Lunno_common.Span.t> Quote
 
 %token <Lunno_common.Span.t> KwLet KwIf KwThen KwElse KwMatch KwImport
-%token <Lunno_common.Span.t> IntegerType FloatingPointType StringType BooleanType UnitType
+%token <Lunno_common.Span.t> IntegerType FloatingPointType StringType BooleanType UnitType ListType
 %token <Lunno_common.Span.t> LeftParen RightParen LeftBrace RightBrace LeftBracket RightBracket
 %token <Lunno_common.Span.t> Plus Minus Asterisk Slash Equal NotEqual Less Greater
 %token <Lunno_common.Span.t> Comma Colon Pipe Cons Arrow Underscore Dot DotDot
@@ -269,13 +270,14 @@ ret_type:
     | LeftParen ret_type_list RightParen Arrow ret_type { TyFunction ($2, $5) }
 
 ret_type_primary:
+    | Quote { let (c, _) = $1 in TyVar (String.make 1 c) }
     | IntegerType { TyInt }
     | FloatingPointType { TyFloat }
     | StringType { TyString }
     | BooleanType { TyBool }
     | UnitType { TyUnit }
     | Identifier { let (name, _) = $1 in TyVar name }
-    | LeftBracket ret_type RightBracket { TyList $2 }
+    | ret_type_primary ListType { TyList $1 }
     | LeftParen ret_type RightParen { $2 }
 
 ret_type_list:
@@ -288,13 +290,14 @@ type_expr:
     | type_primary { $1 }
 
 type_primary:
+    | Quote { let (c, _) = $1 in TyVar (String.make 1 c) }
     | IntegerType { TyInt }
     | FloatingPointType { TyFloat }
     | StringType { TyString }
     | BooleanType { TyBool }
     | UnitType { TyUnit }
     | Identifier { let (name, _) = $1 in TyVar name }
-    | LeftBracket type_expr RightBracket { TyList $2 }
+    | type_primary ListType { TyList $1 }
     | LeftParen type_expr RightParen { $2 }
 
 type_expr_list:
@@ -311,13 +314,14 @@ param_list:
     | param_or_group Comma param_list { $1 @ $3 }
 
 param_type_primary:
+    | Quote { let (c, _) = $1 in TyVar (String.make 1 c) }
     | IntegerType { TyInt }
     | FloatingPointType { TyFloat }
     | StringType { TyString }
     | BooleanType { TyBool }
     | UnitType { TyUnit }
     | Identifier { let (name, _) = $1 in TyVar name }
-    | LeftBracket param_type RightBracket { TyList $2 }
+    | param_type_primary ListType { TyList $1 }
     | LeftParen param_type RightParen { $2 }
 
 param_type_list:

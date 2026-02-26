@@ -31,3 +31,6 @@ val typecheck_program :
     @param lines The source lines, used for error reporting.
     @param program The AST program to typecheck.
     @raise Error.TypeError Raised if a type error is encountered. *)
+
+val run_lsp : unit -> unit
+(** Run the Lunno LSP server *)

@@ -19,6 +19,8 @@ type error_code =
   | E_Type_NotAFunction
   | E_Type_MatchBranchMismatch
   | E_Type_PatternTypeMismatch
+  | E_Type_MissingMain
+  | E_Type_TopLevelExpression
 
 exception LexerError of { code : error_code; msg : string; span : Span.t }
 exception TypeError of { code : error_code; msg : string; span : Span.t }
@@ -43,6 +45,8 @@ let string_of_code = function
   | E_Type_NotAFunction -> "E3008"
   | E_Type_MatchBranchMismatch -> "E3009"
   | E_Type_PatternTypeMismatch -> "E3010"
+  | E_Type_MissingMain -> "E3011"
+  | E_Type_TopLevelExpression -> "E3012"
 
 let print_error (lines : string array) = function
   | LexerError { code; msg; span = start_pos, _ }
@@ -63,92 +67,3 @@ let print_error (lines : string array) = function
       Printf.eprintf "  %s | %s^\n" pad (String.make (col - 1) ' ');
       flush stderr
   | _ -> ()
-
-let already_defined name span =
-  TypeError
-    {
-      code = E_Type_AlreadyDefined;
-      msg = Printf.sprintf "name '%s' is already defined in this scope" name;
-      span;
-    }
-
-let undefined_variable name span =
-  TypeError
-    {
-      code = E_Type_UndefinedVariable;
-      msg = Printf.sprintf "undefined variable '%s'" name;
-      span;
-    }
-
-let type_mismatch expected got span =
-  TypeError
-    {
-      code = E_Type_TypeMismatch;
-      msg = Printf.sprintf "type mismatch: expected '%s', got '%s'" expected got;
-      span;
-    }
-
-let arity_mismatch expected got span =
-  TypeError
-    {
-      code = E_Type_ArityMismatch;
-      msg =
-        Printf.sprintf "arity mismatch: expected %d argument(s), got %d"
-          expected got;
-      span;
-    }
-
-let missing_annotation name span =
-  TypeError
-    {
-      code = E_Type_MissingAnnotation;
-      msg = Printf.sprintf "missing type annotation for '%s'" name;
-      span;
-    }
-
-let if_branch_mismatch then_ty else_ty span =
-  TypeError
-    {
-      code = E_Type_IfBranchMismatch;
-      msg =
-        Printf.sprintf
-          "if branches have different types: then is '%s', else is '%s'" then_ty
-          else_ty;
-      span;
-    }
-
-let missing_else_branch span =
-  TypeError
-    {
-      code = E_Type_MissingElseBranch;
-      msg = "if expression is missing an else branch";
-      span;
-    }
-
-let not_a_function ty span =
-  TypeError
-    {
-      code = E_Type_NotAFunction;
-      msg = Printf.sprintf "expected a function, got '%s'" ty;
-      span;
-    }
-
-let match_branch_mismatch expected got span =
-  TypeError
-    {
-      code = E_Type_MatchBranchMismatch;
-      msg =
-        Printf.sprintf "match branch type mismatch: expected '%s', got '%s'"
-          expected got;
-      span;
-    }
-
-let pattern_type_mismatch expected got span =
-  TypeError
-    {
-      code = E_Type_PatternTypeMismatch;
-      msg =
-        Printf.sprintf "pattern type mismatch: expected '%s', got '%s'" expected
-          got;
-      span;
-    }

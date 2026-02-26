@@ -15,3 +15,4 @@ let parse_file filename =
   (lines, program)
 
 let typecheck_program lines program = Lunno_driver.Cli.typecheck program lines
+let run_lsp () = Lunno_lsp.Server.run ()

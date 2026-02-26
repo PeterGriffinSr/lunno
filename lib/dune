@@ -1,4 +1,4 @@
 (library
  (name lunno)
  (public_name lunno)
- (libraries lunno.driver lunno.frontend lunno.lower lunno.debug))
+ (libraries lunno.driver lunno.frontend lunno.lower lunno.debug lunno.lsp))

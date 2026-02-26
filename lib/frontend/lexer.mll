@@ -16,6 +16,7 @@
         "string", (fun span -> StringType span);
         "bool", (fun span -> BooleanType span);
         "unit", (fun span -> UnitType span);
+        "list", (fun span -> ListType span);
         "true", (fun span -> Boolean (true, span));
         "false", (fun span -> Boolean (false, span));
     ])
@@ -63,6 +64,7 @@ rule token = parse
     | "|" { with_pos lexbuf (fun span -> Pipe span) }
     | "_" { with_pos lexbuf (fun span -> Underscore span) }
     | "." { with_pos lexbuf (fun span -> Dot span) }
+    | '\'' (['a'-'z'] as c) { with_pos lexbuf (fun span -> Quote (c, span)) }
     | ".." { with_pos lexbuf (fun span -> DotDot span) }
     | float_literal as f {
         with_pos lexbuf (fun span ->

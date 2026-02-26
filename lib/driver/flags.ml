@@ -14,6 +14,9 @@ let parse argv =
             Printf.printf "%s\n" version;
             exit 0),
         " Print version and exit" );
+      ( "lsp",
+        Arg.Unit (fun () -> ()),
+        " Run the LSP server (use 'lunno lsp' to run)" );
     ]
   in
   let usage = Printf.sprintf "Usage: %s <options> <files>" argv.(0) in

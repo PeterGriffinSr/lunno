@@ -1,0 +1,7 @@
+let id(x) {
+    x
+}
+
+let a(f, x) {
+    f(x)
+}

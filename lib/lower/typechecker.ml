@@ -40,8 +40,14 @@ let rec unify span t1 t2 =
   | Ast.TyFunction (ps1, r1), Ast.TyFunction (ps2, r2) ->
       if List.length ps1 <> List.length ps2 then
         raise
-          (Error.type_mismatch (Ty_utils.string_of_ty t1)
-             (Ty_utils.string_of_ty t2) span);
+          (Error.TypeError
+             {
+               code = Error.E_Type_TypeMismatch;
+               msg =
+                 Printf.sprintf "type mismatch: expected '%s', got '%s'"
+                   (Ty_utils.string_of_ty t1) (Ty_utils.string_of_ty t2);
+               span;
+             });
       List.iter2 (unify span) ps1 ps2;
       unify span r1 r2
   | Ast.TyMeta m, t | t, Ast.TyMeta m -> (
@@ -55,8 +61,14 @@ let rec unify span t1 t2 =
             | Ast.TyVar _ | Ast.TyList _ | Ast.TyFunction _ | Ast.TyModule _
             | Ast.TyMeta _ ->
                 raise
-                  (Error.type_mismatch (Ty_utils.string_of_ty t1)
-                     (Ty_utils.string_of_ty t2) span)
+                  (Error.TypeError
+                     {
+                       code = Error.E_Type_TypeMismatch;
+                       msg =
+                         Printf.sprintf "type mismatch: expected '%s', got '%s'"
+                           (Ty_utils.string_of_ty t1) (Ty_utils.string_of_ty t2);
+                       span;
+                     })
           else m.Ast.contents := Some t)
   | Ast.TyInt, _
   | Ast.TyFloat, _
@@ -68,8 +80,14 @@ let rec unify span t1 t2 =
   | Ast.TyFunction _, _
   | Ast.TyModule _, _ ->
       raise
-        (Error.type_mismatch (Ty_utils.string_of_ty t1)
-           (Ty_utils.string_of_ty t2) span)
+        (Error.TypeError
+           {
+             code = Error.E_Type_TypeMismatch;
+             msg =
+               Printf.sprintf "type mismatch: expected '%s', got '%s'"
+                 (Ty_utils.string_of_ty t1) (Ty_utils.string_of_ty t2);
+             span;
+           })
 
 let rec free_metas ty =
   match resolve ty with
@@ -109,7 +127,7 @@ let generalize env ty =
   in
   go ty
 
-let instantiate (ty : Ast.ty) : Ast.ty =
+let instantiate ty =
   let mapping : (string, Ast.ty) Hashtbl.t = Hashtbl.create 4 in
   let rec go (ty : Ast.ty) : Ast.ty =
     match ty with
@@ -131,7 +149,15 @@ let instantiate (ty : Ast.ty) : Ast.ty =
   go ty
 
 let bind_name name ty span env =
-  if Env.mem name env then raise (Error.already_defined name span)
+  if Env.mem name env then
+    raise
+      (Error.TypeError
+         {
+           code = Error.E_Type_AlreadyDefined;
+           msg =
+             Printf.sprintf "name '%s' is already defined in this scope" name;
+           span;
+         })
   else Env.add name ty env
 
 let process_imports env imports =
@@ -146,10 +172,14 @@ let process_imports env imports =
             import.Ast.import_span env
       | None ->
           raise
-            (Error.undefined_variable
-               (Printf.sprintf "Module '%s:%s' not found" import.Ast.module_
-                  import.Ast.item)
-               import.Ast.import_span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_UndefinedVariable;
+                 msg =
+                   Printf.sprintf "Module '%s:%s' not found" import.Ast.module_
+                     import.Ast.item;
+                 span = import.Ast.import_span;
+               }))
     env imports
 
 let infer_literal = function
@@ -160,7 +190,7 @@ let infer_literal = function
   | Ast.LUnit -> Ast.TyUnit
   | Ast.LNil -> Ast.TyList (fresh_meta ())
 
-let rec infer_expr env expr : Typed_ast.expr =
+let rec infer_expr env expr =
   match expr with
   | Ast.Literal (lit, span) ->
       let ty = infer_literal lit in
@@ -168,7 +198,14 @@ let rec infer_expr env expr : Typed_ast.expr =
   | Ast.Variable (name, span) -> (
       match Env.find name env with
       | Some ty -> Typed_ast.Variable (name, instantiate ty, span)
-      | None -> raise (Error.undefined_variable name span))
+      | None ->
+          raise
+            (Error.TypeError
+               {
+                 code = Error.E_Type_UndefinedVariable;
+                 msg = Printf.sprintf "undefined variable '%s'" name;
+                 span;
+               }))
   | Ast.Lambda lam -> Typed_ast.Lambda (infer_lambda env lam)
   | Ast.Apply (func, args, span) ->
       let typed_func = infer_expr env func in
@@ -180,16 +217,32 @@ let rec infer_expr env expr : Typed_ast.expr =
       | Ast.TyFunction (param_tys, _) ->
           let expected = List.length param_tys in
           let got = List.length arg_tys in
-          if expected <> got then raise (Error.arity_mismatch expected got span);
+          if expected <> got then
+            raise
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_ArityMismatch;
+                   msg =
+                     Printf.sprintf
+                       "arity mismatch: expected %d argument(s), got %d"
+                       expected got;
+                   span;
+                 });
           unify span func_ty (Ast.TyFunction (arg_tys, ret_ty))
       | Ast.TyMeta _ -> unify span func_ty (Ast.TyFunction (arg_tys, ret_ty))
       | Ast.TyInt | Ast.TyFloat | Ast.TyString | Ast.TyBool | Ast.TyUnit
       | Ast.TyVar _ | Ast.TyList _ | Ast.TyModule _ ->
           raise
-            (Error.not_a_function
-               (Ty_utils.string_of_ty (resolve func_ty))
-               span));
-      Typed_ast.Apply (typed_func, typed_args, resolve ret_ty, span)
+            (Error.TypeError
+               {
+                 code = Error.E_Type_NotAFunction;
+                 msg =
+                   Printf.sprintf "expected a function, got '%s'"
+                     (Ty_utils.string_of_ty (resolve func_ty));
+                 span;
+               }));
+      Typed_ast.Apply
+        (typed_func, typed_args, generalize env (resolve ret_ty), span)
   | Ast.Let { Ast.name; Ast.ty = ann; Ast.let_body; Ast.let_span } ->
       let typed_body =
         match let_body with
@@ -218,30 +271,40 @@ let rec infer_expr env expr : Typed_ast.expr =
       (match ann with
       | Some ann_ty -> unify let_span ann_ty body_ty
       | None -> ());
+      let gen_ty = generalize env body_ty in
       Typed_ast.Let
-        {
-          Typed_ast.name;
-          let_ty = resolve body_ty;
-          let_body = typed_body;
-          let_span;
-        }
+        { Typed_ast.name; let_ty = gen_ty; let_body = typed_body; let_span }
   | Ast.If { Ast.cond; Ast.then_; Ast.else_; Ast.if_span } -> (
       let typed_cond = infer_expr env cond in
       unify if_span (Typed_ast.ty_of typed_cond) Ast.TyBool;
       let typed_then = infer_expr env then_ in
       let then_ty = Typed_ast.ty_of typed_then in
       match else_ with
-      | None -> raise (Error.missing_else_branch if_span)
+      | None ->
+          raise
+            (Error.TypeError
+               {
+                 code = Error.E_Type_MissingElseBranch;
+                 msg = "if expression is missing an else branch";
+                 span = if_span;
+               })
       | Some else_expr ->
           let typed_else = infer_expr env else_expr in
           let else_ty = Typed_ast.ty_of typed_else in
           (try unify if_span then_ty else_ty
            with Error.TypeError _ ->
              raise
-               (Error.if_branch_mismatch
-                  (Ty_utils.string_of_ty (resolve then_ty))
-                  (Ty_utils.string_of_ty (resolve else_ty))
-                  if_span));
+               (Error.TypeError
+                  {
+                    code = Error.E_Type_IfBranchMismatch;
+                    msg =
+                      Printf.sprintf
+                        "if branches have different types: then is '%s', else \
+                         is '%s'"
+                        (Ty_utils.string_of_ty (resolve then_ty))
+                        (Ty_utils.string_of_ty (resolve else_ty));
+                    span = if_span;
+                  }));
           Typed_ast.If
             {
               Typed_ast.cond = typed_cond;
@@ -265,7 +328,7 @@ let rec infer_expr env expr : Typed_ast.expr =
         }
   | Ast.Block (exprs, span) ->
       let typed_exprs, ty = infer_block env exprs span in
-      Typed_ast.Block (typed_exprs, ty, span)
+      Typed_ast.Block (typed_exprs, generalize env (resolve ty), span)
   | Ast.Binary { Ast.binary_op; Ast.left; Ast.right; Ast.binary_span } ->
       infer_binary env binary_op left right binary_span
   | Ast.Unary { unary_op = Ast.OpNegate; Ast.expr = e; Ast.unary_span } ->
@@ -276,12 +339,19 @@ let rec infer_expr env expr : Typed_ast.expr =
          try unify unary_span ty Ast.TyFloat
          with _ ->
            raise
-             (Error.type_mismatch "int" (Ty_utils.string_of_ty ty) unary_span)));
+             (Error.TypeError
+                {
+                  code = Error.E_Type_TypeMismatch;
+                  msg =
+                    Printf.sprintf "type mismatch: expected 'int', got '%s'"
+                      (Ty_utils.string_of_ty ty);
+                  span = unary_span;
+                })));
       Typed_ast.Unary
         {
           Typed_ast.unary_op = Ast.OpNegate;
           Typed_ast.expr = typed_e;
-          Typed_ast.unary_ty = resolve ty;
+          Typed_ast.unary_ty = generalize env (resolve ty);
           Typed_ast.unary_span;
         }
   | Ast.MemberAccess (obj, member, span) -> (
@@ -296,15 +366,36 @@ let rec infer_expr env expr : Typed_ast.expr =
                   let ty = instantiate member_ty in
                   Typed_ast.MemberAccess (typed_obj, member, ty, span)
               | None ->
-                  raise (Error.undefined_variable (name ^ "." ^ member) span))
+                  raise
+                    (Error.TypeError
+                       {
+                         code = Error.E_Type_UndefinedVariable;
+                         msg =
+                           Printf.sprintf "undefined variable '%s.%s'" name
+                             member;
+                         span;
+                       }))
           | None ->
-              raise (Error.undefined_variable (namespace ^ ":" ^ name) span))
+              raise
+                (Error.TypeError
+                   {
+                     code = Error.E_Type_UndefinedVariable;
+                     msg =
+                       Printf.sprintf "undefined variable '%s:%s'" namespace
+                         name;
+                     span;
+                   }))
       | Ast.TyInt | Ast.TyFloat | Ast.TyString | Ast.TyBool | Ast.TyUnit
       | Ast.TyVar _ | Ast.TyMeta _ | Ast.TyList _ | Ast.TyFunction _ ->
           raise
-            (Error.type_mismatch "module"
-               (Ty_utils.string_of_ty obj_ty)
-               (Ast.span_of_expr obj)))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_TypeMismatch;
+                 msg =
+                   Printf.sprintf "type mismatch: expected 'module', got '%s'"
+                     (Ty_utils.string_of_ty obj_ty);
+                 span = Ast.span_of_expr obj;
+               }))
   | Ast.Range (start, stop, span) ->
       let typed_start = infer_expr env start in
       let typed_stop = infer_expr env stop in
@@ -312,7 +403,7 @@ let rec infer_expr env expr : Typed_ast.expr =
       unify span (Typed_ast.ty_of typed_stop) Ast.TyInt;
       Typed_ast.Range (typed_start, typed_stop, span)
 
-and infer_lambda env lam : Typed_ast.lambda =
+and infer_lambda env lam =
   let param_tys =
     List.map
       (fun param ->
@@ -341,7 +432,8 @@ and infer_lambda env lam : Typed_ast.lambda =
       in
       unify body_span ann_ret body_ty
   | None -> ());
-  let resolved_param_tys = List.map resolve param_tys in
+  let gen = generalize env in
+  let resolved_param_tys = List.map (fun t -> gen (resolve t)) param_tys in
   let typed_params =
     List.map2
       (fun (p : Ast.param) ty ->
@@ -352,8 +444,10 @@ and infer_lambda env lam : Typed_ast.lambda =
         })
       lam.Ast.params resolved_param_tys
   in
-  let ret_ty = resolve body_ty in
-  let lambda_ty = Ast.TyFunction (resolved_param_tys, ret_ty) in
+  let ret_ty = gen (resolve body_ty) in
+  let lambda_ty =
+    gen (Ast.TyFunction (List.map resolve param_tys, resolve body_ty))
+  in
   {
     Typed_ast.params = typed_params;
     Typed_ast.ret_ty;
@@ -419,10 +513,16 @@ and infer_match env scrutinee_ty cases _span =
             (try unify case.Ast.case_span first_ty case_ty
              with Error.TypeError _ ->
                raise
-                 (Error.match_branch_mismatch
-                    (Ty_utils.string_of_ty (resolve first_ty))
-                    (Ty_utils.string_of_ty (resolve case_ty))
-                    case.Ast.case_span));
+                 (Error.TypeError
+                    {
+                      code = Error.E_Type_MatchBranchMismatch;
+                      msg =
+                        Printf.sprintf
+                          "match branch type mismatch: expected '%s', got '%s'"
+                          (Ty_utils.string_of_ty (resolve first_ty))
+                          (Ty_utils.string_of_ty (resolve case_ty));
+                      span = case.Ast.case_span;
+                    }));
             {
               Typed_ast.pattern = case.Ast.pattern;
               guard = typed_guard;
@@ -446,10 +546,15 @@ and infer_pattern env expected pat =
       | Ast.TyFloat | Ast.TyString | Ast.TyBool | Ast.TyUnit | Ast.TyVar _
       | Ast.TyModule _ | Ast.TyList _ | Ast.TyFunction _ ->
           raise
-            (Error.pattern_type_mismatch
-               (Ty_utils.string_of_ty expected)
-               (Ty_utils.string_of_ty Ast.TyInt)
-               span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_PatternTypeMismatch;
+                 msg =
+                   Printf.sprintf
+                     "pattern type mismatch: expected '%s', got 'int'"
+                     (Ty_utils.string_of_ty expected);
+                 span;
+               }))
   | Ast.PFloatLiteral (_, span) -> (
       match resolve expected with
       | Ast.TyFloat -> env
@@ -459,10 +564,15 @@ and infer_pattern env expected pat =
       | Ast.TyInt | Ast.TyString | Ast.TyBool | Ast.TyUnit | Ast.TyVar _
       | Ast.TyModule _ | Ast.TyList _ | Ast.TyFunction _ ->
           raise
-            (Error.pattern_type_mismatch
-               (Ty_utils.string_of_ty expected)
-               (Ty_utils.string_of_ty Ast.TyFloat)
-               span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_PatternTypeMismatch;
+                 msg =
+                   Printf.sprintf
+                     "pattern type mismatch: expected '%s', got 'float'"
+                     (Ty_utils.string_of_ty expected);
+                 span;
+               }))
   | Ast.PStringLiteral (_, span) -> (
       match resolve expected with
       | Ast.TyString -> env
@@ -472,10 +582,15 @@ and infer_pattern env expected pat =
       | Ast.TyInt | Ast.TyFloat | Ast.TyBool | Ast.TyUnit | Ast.TyVar _
       | Ast.TyModule _ | Ast.TyList _ | Ast.TyFunction _ ->
           raise
-            (Error.pattern_type_mismatch
-               (Ty_utils.string_of_ty expected)
-               (Ty_utils.string_of_ty Ast.TyString)
-               span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_PatternTypeMismatch;
+                 msg =
+                   Printf.sprintf
+                     "pattern type mismatch: expected '%s', got 'string'"
+                     (Ty_utils.string_of_ty expected);
+                 span;
+               }))
   | Ast.PBooleanLiteral (_, span) -> (
       match resolve expected with
       | Ast.TyBool -> env
@@ -485,10 +600,15 @@ and infer_pattern env expected pat =
       | Ast.TyInt | Ast.TyFloat | Ast.TyString | Ast.TyUnit | Ast.TyVar _
       | Ast.TyModule _ | Ast.TyList _ | Ast.TyFunction _ ->
           raise
-            (Error.pattern_type_mismatch
-               (Ty_utils.string_of_ty expected)
-               (Ty_utils.string_of_ty Ast.TyBool)
-               span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_PatternTypeMismatch;
+                 msg =
+                   Printf.sprintf
+                     "pattern type mismatch: expected '%s', got 'bool'"
+                     (Ty_utils.string_of_ty expected);
+                 span;
+               }))
   | Ast.PNil span -> (
       match resolve expected with
       | Ast.TyList _ -> env
@@ -499,9 +619,15 @@ and infer_pattern env expected pat =
       | Ast.TyInt | Ast.TyFloat | Ast.TyString | Ast.TyBool | Ast.TyUnit
       | Ast.TyVar _ | Ast.TyModule _ | Ast.TyFunction _ ->
           raise
-            (Error.pattern_type_mismatch
-               (Ty_utils.string_of_ty expected)
-               "[_]" span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_PatternTypeMismatch;
+                 msg =
+                   Printf.sprintf
+                     "pattern type mismatch: expected '%s', got '_ list'"
+                     (Ty_utils.string_of_ty expected);
+                 span;
+               }))
   | Ast.PCons (hd, tl, span) -> (
       match resolve expected with
       | Ast.TyList elem_ty ->
@@ -515,16 +641,23 @@ and infer_pattern env expected pat =
       | Ast.TyInt | Ast.TyFloat | Ast.TyString | Ast.TyBool | Ast.TyUnit
       | Ast.TyVar _ | Ast.TyModule _ | Ast.TyFunction _ ->
           raise
-            (Error.pattern_type_mismatch
-               (Ty_utils.string_of_ty expected)
-               "[_]" span))
+            (Error.TypeError
+               {
+                 code = Error.E_Type_PatternTypeMismatch;
+                 msg =
+                   Printf.sprintf
+                     "pattern type mismatch: expected '%s', got '_ list'"
+                     (Ty_utils.string_of_ty expected);
+                 span;
+               }))
 
 and infer_block env exprs _span =
   let rec go env acc = function
     | [] -> (List.rev acc, Ast.TyUnit)
     | [ e ] ->
         let typed_e = infer_expr env e in
-        (List.rev (typed_e :: acc), Typed_ast.ty_of typed_e)
+        let ty = generalize env (resolve (Typed_ast.ty_of typed_e)) in
+        (List.rev (typed_e :: acc), ty)
     | Ast.Let { Ast.name; Ast.ty = ann; Ast.let_body; Ast.let_span } :: rest ->
         let pre_ty = fresh_meta () in
         let pre_env = bind_name name pre_ty let_span env in
@@ -540,7 +673,7 @@ and infer_block env exprs _span =
           Typed_ast.Let
             {
               Typed_ast.name;
-              Typed_ast.let_ty = resolve body_ty;
+              Typed_ast.let_ty = gen_ty;
               Typed_ast.let_body = typed_body;
               Typed_ast.let_span;
             }
@@ -584,19 +717,35 @@ and infer_binary env op left right span : Typed_ast.expr =
             Ast.TyInt
         | Ast.TyInt, got ->
             raise
-              (Error.type_mismatch "int"
-                 (Ty_utils.string_of_ty got)
-                 (Typed_ast.span_of typed_right))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf "type mismatch: expected 'int', got '%s'"
+                       (Ty_utils.string_of_ty got);
+                   span = Typed_ast.span_of typed_right;
+                 })
         | Ast.TyFloat, got ->
             raise
-              (Error.type_mismatch "float"
-                 (Ty_utils.string_of_ty got)
-                 (Typed_ast.span_of typed_right))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf "type mismatch: expected 'float', got '%s'"
+                       (Ty_utils.string_of_ty got);
+                   span = Typed_ast.span_of typed_right;
+                 })
         | Ast.TyMeta _, got ->
             raise
-              (Error.type_mismatch "int or float"
-                 (Ty_utils.string_of_ty got)
-                 (Typed_ast.span_of typed_right))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf
+                       "type mismatch: expected 'int or float', got '%s'"
+                       (Ty_utils.string_of_ty got);
+                   span = Typed_ast.span_of typed_right;
+                 })
         | Ast.TyString, _
         | Ast.TyBool, _
         | Ast.TyUnit, _
@@ -605,17 +754,28 @@ and infer_binary env op left right span : Typed_ast.expr =
         | Ast.TyList _, _
         | Ast.TyFunction _, _ ->
             raise
-              (Error.type_mismatch "int or float"
-                 (Ty_utils.string_of_ty (resolve left_ty))
-                 (Typed_ast.span_of typed_left)))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf
+                       "type mismatch: expected 'int or float', got '%s'"
+                       (Ty_utils.string_of_ty (resolve left_ty));
+                   span = Typed_ast.span_of typed_left;
+                 }))
     | Ast.OpEqual | Ast.OpNotEqual ->
         (try unify (Typed_ast.span_of typed_right) left_ty right_ty
          with Error.TypeError _ ->
            raise
-             (Error.type_mismatch
-                (Ty_utils.string_of_ty (resolve left_ty))
-                (Ty_utils.string_of_ty (resolve right_ty))
-                (Typed_ast.span_of typed_right)));
+             (Error.TypeError
+                {
+                  code = Error.E_Type_TypeMismatch;
+                  msg =
+                    Printf.sprintf "type mismatch: expected '%s', got '%s'"
+                      (Ty_utils.string_of_ty (resolve left_ty))
+                      (Ty_utils.string_of_ty (resolve right_ty));
+                  span = Typed_ast.span_of typed_right;
+                }));
         Ast.TyBool
     | Ast.OpLess | Ast.OpGreater -> (
         match (resolve left_ty, resolve right_ty) with
@@ -639,19 +799,35 @@ and infer_binary env op left right span : Typed_ast.expr =
             Ast.TyBool
         | Ast.TyInt, got ->
             raise
-              (Error.type_mismatch "int"
-                 (Ty_utils.string_of_ty got)
-                 (Typed_ast.span_of typed_right))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf "type mismatch: expected 'int', got '%s'"
+                       (Ty_utils.string_of_ty got);
+                   span = Typed_ast.span_of typed_right;
+                 })
         | Ast.TyFloat, got ->
             raise
-              (Error.type_mismatch "float"
-                 (Ty_utils.string_of_ty got)
-                 (Typed_ast.span_of typed_right))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf "type mismatch: expected 'float', got '%s'"
+                       (Ty_utils.string_of_ty got);
+                   span = Typed_ast.span_of typed_right;
+                 })
         | Ast.TyMeta _, got ->
             raise
-              (Error.type_mismatch "int or float"
-                 (Ty_utils.string_of_ty got)
-                 (Typed_ast.span_of typed_right))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf
+                       "type mismatch: expected 'int or float', got '%s'"
+                       (Ty_utils.string_of_ty got);
+                   span = Typed_ast.span_of typed_right;
+                 })
         | Ast.TyString, _
         | Ast.TyBool, _
         | Ast.TyUnit, _
@@ -660,9 +836,15 @@ and infer_binary env op left right span : Typed_ast.expr =
         | Ast.TyList _, _
         | Ast.TyFunction _, _ ->
             raise
-              (Error.type_mismatch "int or float"
-                 (Ty_utils.string_of_ty (resolve left_ty))
-                 (Typed_ast.span_of typed_left)))
+              (Error.TypeError
+                 {
+                   code = Error.E_Type_TypeMismatch;
+                   msg =
+                     Printf.sprintf
+                       "type mismatch: expected 'int or float', got '%s'"
+                       (Ty_utils.string_of_ty (resolve left_ty));
+                   span = Typed_ast.span_of typed_left;
+                 }))
     | Ast.OpCons ->
         let elem = fresh_meta () in
         unify (Typed_ast.span_of typed_left) left_ty elem;
@@ -674,7 +856,7 @@ and infer_binary env op left right span : Typed_ast.expr =
       Typed_ast.binary_op = op;
       Typed_ast.left = typed_left;
       Typed_ast.right = typed_right;
-      Typed_ast.binary_ty = resolve ty;
+      Typed_ast.binary_ty = generalize env (resolve ty);
       Typed_ast.binary_span = span;
     }
 
@@ -697,7 +879,7 @@ let infer_program (program : Ast.program) : Typed_ast.program =
           Typed_ast.Let
             {
               Typed_ast.name;
-              Typed_ast.let_ty = resolve body_ty;
+              Typed_ast.let_ty = gen_ty;
               Typed_ast.let_body = typed_body;
               Typed_ast.let_span;
             }

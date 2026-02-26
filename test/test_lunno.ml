@@ -1542,11 +1542,12 @@ let tc_test_match_guard_not_bool ctxt =
     "let f(x: int) -> int { match x { | n if n + 1 -> n | _ -> 0 } }"
 
 let tc_test_match_nil_pattern ctxt =
-  assert_ok ~ctxt "let f(xs: [int]) -> int { match xs { | [] -> 0 | _ -> 1 } }"
+  assert_ok ~ctxt
+    "let f(xs: int list) -> int { match xs { | [] -> 0 | _ -> 1 } }"
 
 let tc_test_match_cons_pattern ctxt =
   assert_ok ~ctxt
-    "let f(xs: [int]) -> int { match xs { | x :: _ -> x | [] -> 0 } }"
+    "let f(xs: int list) -> int { match xs { | x :: _ -> x | [] -> 0 } }"
 
 let tc_test_match_string ctxt =
   assert_ok ~ctxt
@@ -1585,15 +1586,16 @@ let tc_test_block_let_uses_previous ctxt =
   assert_ok ~ctxt "let f(x: int) -> int { let y = x + 1\n let z = y + 1\n z }"
 
 let tc_test_match_nil ctxt =
-  assert_ok ~ctxt "let f(xs: [int]) -> int { match xs { | [] -> 0 | _ -> 1 } }"
+  assert_ok ~ctxt
+    "let f(xs: int list) -> int { match xs { | [] -> 0 | _ -> 1 } }"
 
 let tc_test_match_cons_head ctxt =
   assert_ok ~ctxt
-    "let f(xs: [int]) -> int { match xs { | x :: _ -> x | [] -> 0 } }"
+    "let f(xs: int list) -> int { match xs { | x :: _ -> x | [] -> 0 } }"
 
 let tc_test_match_cons_wrong_type ctxt =
   assert_error ~ctxt ~code:(Some E_Type_PatternTypeMismatch)
-    "let f(xs: [int]) -> int { match xs { | \"a\" :: _ -> 1 | _ -> 0 } }"
+    "let f(xs: int list) -> int { match xs { | \"a\" :: _ -> 1 | _ -> 0 } }"
 
 let tc_test_function_as_arg ctxt =
   assert_ok ~ctxt
@@ -1687,7 +1689,7 @@ let tc_poly_twice ctxt =
 
 let tc_poly_length_int_list ctxt =
   assert_ok ~ctxt
-    {|let length(xs: [int]) -> int {
+    {|let length(xs: int list) -> int {
         match xs {
           | []      -> 0
           | _ :: t  -> 1 + length(t)
@@ -1754,7 +1756,7 @@ let tc_poly_length_untyped ctxt =
 
 let tc_poly_head_int ctxt =
   assert_ok ~ctxt
-    {|let head(xs: [int]) -> int {
+    {|let head(xs: int list) -> int {
         match xs {
           | x :: _ -> x
           | [] -> 0
@@ -1840,7 +1842,7 @@ let tc_poly_higher_order_returns ctxt =
 
 let tc_poly_match_variable_bind ctxt =
   assert_ok ~ctxt
-    {|let first_or_default(xs: [int], default: int) -> int {
+    {|let first_or_default(xs: int list, default: int) -> int {
         match xs {
           | h :: _ -> h
           | []     -> default
@@ -1849,7 +1851,7 @@ let tc_poly_match_variable_bind ctxt =
 
 let tc_poly_match_guard_poly ctxt =
   assert_ok ~ctxt
-    {|let safe_head(xs: [int]) -> int {
+    {|let safe_head(xs: int list) -> int {
         match xs {
           | h :: _ if h > 0 -> h
           | _ -> 0
@@ -1927,43 +1929,43 @@ let tc_poly_stress_const ctxt =
       a|}
 
 let tc_poly_list_literal_empty ctxt =
-  assert_ok ~ctxt {|let xs: [int] = []
+  assert_ok ~ctxt {|let xs: int list = []
       xs|}
 
 let tc_poly_list_literal_singleton ctxt =
-  assert_ok ~ctxt {|let xs: [int] = [42]
+  assert_ok ~ctxt {|let xs: int list = [42]
       xs|}
 
 let tc_poly_list_literal_multi ctxt =
-  assert_ok ~ctxt {|let xs: [int] = [1, 2, 3]
+  assert_ok ~ctxt {|let xs: int list = [1, 2, 3]
       xs|}
 
 let tc_poly_list_literal_float ctxt =
-  assert_ok ~ctxt {|let xs: [float] = [1.0, 2.0, 3.0]
+  assert_ok ~ctxt {|let xs: float list = [1.0, 2.0, 3.0]
       xs|}
 
 let tc_poly_list_literal_bool ctxt =
-  assert_ok ~ctxt {|let xs: [bool] = [true, false, true]
+  assert_ok ~ctxt {|let xs: bool list = [true, false, true]
       xs|}
 
 let tc_poly_list_literal_string ctxt =
-  assert_ok ~ctxt {|let xs: [string] = ["foo", "bar", "baz"]
+  assert_ok ~ctxt {|let xs: string list = ["foo", "bar", "baz"]
       xs|}
 
 let tc_poly_list_literal_as_arg ctxt =
   assert_ok ~ctxt
-    {|let head(xs: [int]) -> int {
+    {|let head(xs: int list) -> int {
         match xs { | x :: _ -> x | [] -> 0 }
       }
       head([10, 20, 30])|}
 
 let tc_poly_list_literal_cons_prefix ctxt =
-  assert_ok ~ctxt {|let xs: [int] = 0 :: [1, 2, 3]
+  assert_ok ~ctxt {|let xs: int list = 0 :: [1, 2, 3]
       xs|}
 
 let tc_poly_list_literal_in_match ctxt =
   assert_ok ~ctxt
-    {|let f(xs: [int]) -> int {
+    {|let f(xs: int list) -> int {
         match xs {
           | []      -> 0
           | x :: _  -> x
@@ -1973,25 +1975,25 @@ let tc_poly_list_literal_in_match ctxt =
 
 let tc_poly_list_literal_empty_inferred ctxt =
   assert_ok ~ctxt
-    {|let f(xs: [int]) -> int {
+    {|let f(xs: int list) -> int {
         match xs { | [] -> 0 | x :: _ -> x }
       }
       f([])|}
 
 let tc_poly_list_literal_length ctxt =
   assert_ok ~ctxt
-    {|let length(xs: [int]) -> int {
+    {|let length(xs: int list) -> int {
         match xs { | [] -> 0 | _ :: t -> 1 + length(t) }
       }
       length([1, 2, 3, 4, 5])|}
 
 let tc_poly_list_literal_type_mismatch ctxt =
   assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
-    {|let xs: [int] = [1, 2.0]|}
+    {|let xs: int list = [1, 2.0]|}
 
 let tc_poly_list_literal_annotation_mismatch ctxt =
   assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
-    {|let xs: [string] = [1, 2, 3]|}
+    {|let xs: string list = [1, 2, 3]|}
 
 let suite =
   "lunno tests"

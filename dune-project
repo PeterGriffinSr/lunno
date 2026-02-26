@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.8.0)
+(version 0.9.0)
 
 (generate_opam_files true)
 
@@ -31,6 +31,10 @@
     (< 5.5.0)))
   (dune
    (>= 3.21))
+  (lsp
+   (>= 1.25.0))
+  (jsonrpc
+   (>= 1.25.0))
   (menhir
    (>= 20260209))
   (ounit2
@@ -38,7 +42,6 @@
     :with-test
     (= 2.2.7))))
  (depopts
-  (merlin :dev)
-  (ocaml-lsp-server :dev))
+  (merlin :dev))
  (tags
   (lunno functional language compiler typed static-typing)))

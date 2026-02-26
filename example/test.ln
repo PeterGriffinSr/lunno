@@ -1,1 +1,0 @@
-let apply(f: (int) -> int, x: int) -> int { f(x) }

@@ -11,7 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
-### [0.8.0] - 2026-02-25
+## [0.9.0] - 2026-02-26
+
+### Added
+- Lunno Language server.
+
+## [0.8.0] - 2026-02-25
 
 ### Added
 - `Typed_ast` module in `lunno.common`- a fully type-annotated AST where every
