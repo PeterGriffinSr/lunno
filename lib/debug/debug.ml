@@ -5,8 +5,14 @@ let rec dump_pattern ?(indent = 0) = function
       Printf.printf "%s_Pattern Wildcard %s\n" (String.make indent ' ')
         (Ty_utils.string_of_span sp)
   | Ast.PVariable (name, sp) ->
-      Printf.printf "%s_Pattern Var(%s) %s\n" (String.make indent ' ') name
-        (Ty_utils.string_of_span sp)
+      let first = name.[0] in
+      if Char.code first >= 65 && Char.code first <= 90 then
+        Printf.printf "%s_Pattern Constructor(%s) %s\n" (String.make indent ' ')
+          name
+          (Ty_utils.string_of_span sp)
+      else
+        Printf.printf "%s_Pattern Var(%s) %s\n" (String.make indent ' ') name
+          (Ty_utils.string_of_span sp)
   | Ast.PIntLiteral (i, sp) ->
       Printf.printf "%s_Pattern Int(%Ld) %s\n" (String.make indent ' ') i
         (Ty_utils.string_of_span sp)
@@ -27,6 +33,11 @@ let rec dump_pattern ?(indent = 0) = function
         (Ty_utils.string_of_span sp);
       dump_pattern ~indent:(indent + 2) h;
       dump_pattern ~indent:(indent + 2) t
+  | Ast.PConstructor (name, fields, sp) ->
+      Printf.printf "%s_Pattern Constructor(%s) %s\n" (String.make indent ' ')
+        name
+        (Ty_utils.string_of_span sp);
+      List.iter (dump_pattern ~indent:(indent + 2)) fields
 
 and dump_expr ?(indent = 0) e =
   let pad = String.make indent ' ' in
@@ -53,8 +64,14 @@ and dump_expr ?(indent = 0) e =
           Printf.printf "%sNil : %s %s\n" pad ty_str
             (Ty_utils.string_of_span sp))
   | Typed_ast.Variable (name, ty, sp) ->
-      Printf.printf "%sVar(%s) : %s %s\n" pad name (Ty_utils.string_of_ty ty)
-        (Ty_utils.string_of_span sp)
+      let first = name.[0] in
+      if Char.code first >= 65 && Char.code first <= 90 then
+        Printf.printf "%sConstructor(%s) : %s %s\n" pad name
+          (Ty_utils.string_of_ty ty)
+          (Ty_utils.string_of_span sp)
+      else
+        Printf.printf "%sVar(%s) : %s %s\n" pad name (Ty_utils.string_of_ty ty)
+          (Ty_utils.string_of_span sp)
   | Typed_ast.Binary
       {
         Typed_ast.binary_op;
@@ -178,7 +195,8 @@ and dump_expr ?(indent = 0) e =
       | Typed_ast.Lambda _ | Typed_ast.Apply _ | Typed_ast.Let _
       | Typed_ast.If _ | Typed_ast.Match _ | Typed_ast.Block _
       | Typed_ast.Binary _ | Typed_ast.Unary _ | Typed_ast.Literal _
-      | Typed_ast.MemberAccess _ | Typed_ast.Range _ ->
+      | Typed_ast.MemberAccess _ | Typed_ast.Range _ | Typed_ast.Constructor _
+        ->
           Printf.printf "%sApply : %s %s\n" pad (Ty_utils.string_of_ty ty)
             (Ty_utils.string_of_span span);
           Printf.printf "%s  Function:\n" pad;
@@ -202,11 +220,33 @@ and dump_expr ?(indent = 0) e =
       dump_expr ~indent:(indent + 4) start_expr;
       Printf.printf "%s  End:\n" pad;
       dump_expr ~indent:(indent + 4) end_expr
+  | Typed_ast.Constructor (name, args, ty, span) ->
+      Printf.printf "%sConstructor(%s) : %s %s\n" pad name
+        (Ty_utils.string_of_ty ty)
+        (Ty_utils.string_of_span span);
+      List.iteri
+        (fun i arg ->
+          Printf.printf "%s  [%d]:\n" pad i;
+          dump_expr ~indent:(indent + 4) arg)
+        args
 
-let dump_import (imp : Ast.import) =
+let dump_import imp =
   Printf.printf "Import(\"%s:%s\") %s\n" imp.Ast.module_ imp.Ast.item
     (Ty_utils.string_of_span imp.Ast.import_span)
 
-let dump_program (prog : Typed_ast.program) =
+let dump_type_decl td =
+  Printf.printf "Data(%s) %s\n" td.Ast.type_name
+    (Ty_utils.string_of_span td.Ast.type_span);
+  List.iter
+    (fun (v : Ast.variant) ->
+      match v.Ast.variant_fields with
+      | [] -> Printf.printf "  | %s\n" v.Ast.variant_name
+      | fields ->
+          Printf.printf "  | %s(%s)\n" v.Ast.variant_name
+            (String.concat ", " (List.map Ty_utils.string_of_ty fields)))
+    td.Ast.variants
+
+let dump_program prog =
   List.iter dump_import prog.Typed_ast.imports;
+  List.iter dump_type_decl prog.Typed_ast.type_decls;
   List.iter (dump_expr ~indent:0) prog.Typed_ast.body

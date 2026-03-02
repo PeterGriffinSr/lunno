@@ -496,7 +496,13 @@ let test_simple_let ctxt =
 
 let test_typed_let ctxt =
   match parse_expr "let x: int = 42" with
-  | Let { name = "x"; ty = Some TyInt; let_body = Literal (LInt 42L, _); _ } ->
+  | Let
+      {
+        name = "x";
+        ty = Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ });
+        let_body = Literal (LInt 42L, _);
+        _;
+      } ->
       ()
   | _ -> assert_failure "Expected typed let binding"
 
@@ -564,13 +570,23 @@ let test_function_typed_params ctxt =
   | Let
       {
         name = "f";
-        let_body = Lambda { params; ret_ty = Some Ast.TyInt; _ };
+        let_body =
+          Lambda
+            {
+              params;
+              ret_ty = Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ });
+              _;
+            };
         _;
       } -> (
       match params with
-      | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
+      | [ p1; p2 ] -> (
+          (match p1.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p1");
+          match p2.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p2")
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected typed function"
 
@@ -579,7 +595,9 @@ let test_function_mixed_params ctxt =
   | Let { let_body = Lambda { params; _ }; _ } -> (
       match params with
       | [ p1; p2 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
+          (match p1.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p1");
           assert_equal ~ctxt None p2.param_ty
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with mixed params"
@@ -588,11 +606,15 @@ let test_function_uniform_syntax ctxt =
   match parse_expr "let f(int[x, y]) -> int { x + y }" with
   | Let { let_body = Lambda { params; _ }; _ } -> (
       match params with
-      | [ p1; p2 ] ->
+      | [ p1; p2 ] -> (
           assert_equal ~ctxt "x" p1.param_name;
           assert_equal ~ctxt "y" p2.param_name;
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty
+          (match p1.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p1");
+          match p2.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p2")
       | _ -> assert_failure "Expected 2 params")
   | _ -> assert_failure "Expected function with uniform syntax"
 
@@ -602,8 +624,12 @@ let test_function_mixed_uniform_syntax ctxt =
       assert_equal ~ctxt 3 (List.length params);
       match params with
       | [ p1; p2; p3 ] ->
-          assert_equal ~ctxt (Some Ast.TyInt) p1.param_ty;
-          assert_equal ~ctxt (Some Ast.TyInt) p2.param_ty;
+          (match p1.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p1");
+          (match p2.param_ty with
+          | Some (Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ }) -> ()
+          | _ -> assert_failure "Expected FInt family meta for p2");
           assert_equal ~ctxt (Some Ast.TyString) p3.param_ty
       | _ -> assert_failure "Expected 3 params")
   | _ -> assert_failure "Expected function with mixed uniform syntax"
@@ -1352,6 +1378,177 @@ let test_match_exhaustive_bool ctxt =
       ()
   | _ -> assert_failure "Expected exhaustive boolean match"
 
+let test_adt_simple_declaration ctxt =
+  let prog = parse_program "data Color = { | Red | Green | Blue }" in
+  match prog.type_decls with
+  | [ { type_name = "Color"; variants; _ } ] ->
+      assert_equal ~ctxt 3 (List.length variants);
+      assert_equal ~ctxt "Red" (List.nth variants 0).variant_name;
+      assert_equal ~ctxt "Green" (List.nth variants 1).variant_name;
+      assert_equal ~ctxt "Blue" (List.nth variants 2).variant_name
+  | _ -> assert_failure "Expected single ADT declaration"
+
+let test_adt_single_variant ctxt =
+  let prog = parse_program "data Unit = { | Only }" in
+  match prog.type_decls with
+  | [ { type_name = "Unit"; variants = [ { variant_name = "Only"; _ } ]; _ } ]
+    ->
+      ()
+  | _ -> assert_failure "Expected single-variant ADT"
+
+let test_adt_variant_with_fields ctxt =
+  let prog = parse_program "data Option = { | Some(int) | None }" in
+  match prog.type_decls with
+  | [ { variants; _ } ] -> (
+      match variants with
+      | [ some; none ] ->
+          assert_equal ~ctxt "Some" some.variant_name;
+          assert_equal ~ctxt 1 (List.length some.variant_fields);
+          assert_equal ~ctxt "None" none.variant_name;
+          assert_equal ~ctxt 0 (List.length none.variant_fields)
+      | _ -> assert_failure "Expected 2 variants")
+  | _ -> assert_failure "Expected Option ADT"
+
+let test_adt_result_type ctxt =
+  let prog = parse_program "data Result = { | Ok(int) | Err(string) }" in
+  match prog.type_decls with
+  | [ { type_name = "Result"; variants; _ } ] -> (
+      assert_equal ~ctxt 2 (List.length variants);
+      (match (List.nth variants 0).variant_fields with
+      | [ Ast.TyFamilyMeta { Ast.family = Ast.FInt; _ } ] -> ()
+      | _ -> assert_failure "Expected FInt family meta for Ok field");
+      match (List.nth variants 1).variant_fields with
+      | [ Ast.TyString ] -> ()
+      | _ -> assert_failure "Expected TyString for Err field")
+  | _ -> assert_failure "Expected Result ADT"
+
+let test_adt_multi_field_variant ctxt =
+  let prog = parse_program "data Pair = { | Pair(int, int) }" in
+  match prog.type_decls with
+  | [ { variants = [ { variant_name = "Pair"; variant_fields; _ } ]; _ } ] ->
+      assert_equal ~ctxt 2 (List.length variant_fields)
+  | _ -> assert_failure "Expected Pair ADT with two fields"
+
+let test_adt_multiple_declarations ctxt =
+  let prog =
+    parse_program
+      "data Color = { | Red | Green }\ndata Shape = { | Circle | Square }"
+  in
+  assert_equal ~ctxt 2 (List.length prog.type_decls)
+
+let test_adt_constructor_expr ctxt =
+  match parse_expr "Some(42)" with
+  | Apply (Variable ("Some", _), [ Literal (LInt 42L, _) ], _) -> ()
+  | _ -> assert_failure "Expected constructor application"
+
+let test_adt_constructor_no_args ctxt =
+  match parse_expr "None" with
+  | Variable ("None", _) | Constructor ("None", [], _) -> ()
+  | _ -> assert_failure "Expected nullary constructor"
+
+let test_adt_constructor_multiple_args ctxt =
+  match parse_expr "Pair(1, 2)" with
+  | Apply
+      (Variable ("Pair", _), [ Literal (LInt 1L, _); Literal (LInt 2L, _) ], _)
+    ->
+      ()
+  | _ -> assert_failure "Expected constructor with two args"
+
+let test_adt_constructor_nested ctxt =
+  match parse_expr "Some(Some(42))" with
+  | Apply
+      ( Variable ("Some", _),
+        [ Apply (Variable ("Some", _), [ Literal (LInt 42L, _) ], _) ],
+        _ ) ->
+      ()
+  | _ -> assert_failure "Expected nested constructor"
+
+let test_adt_constructor_in_let ctxt =
+  match parse_expr "let x = Some(42)" with
+  | Let
+      {
+        let_body = Apply (Variable ("Some", _), [ Literal (LInt 42L, _) ], _);
+        _;
+      } ->
+      ()
+  | _ -> assert_failure "Expected constructor as let body"
+
+let test_adt_constructor_pattern ctxt =
+  match parse_expr "match x { | Some(n) -> n | None -> 0 }" with
+  | Match
+      {
+        cases =
+          [
+            {
+              pattern = PConstructor ("Some", [ PVariable ("n", _) ], _);
+              case_body = Variable ("n", _);
+              _;
+            };
+            {
+              pattern = PVariable ("None", _);
+              case_body = Literal (LInt 0L, _);
+              _;
+            };
+          ];
+        _;
+      } ->
+      ()
+  | _ -> assert_failure "Expected constructor patterns in match"
+
+let test_adt_constructor_pattern_multi_field ctxt =
+  match parse_expr "match p { | Pair(a, b) -> a + b }" with
+  | Match
+      {
+        cases =
+          [
+            {
+              pattern =
+                PConstructor
+                  ("Pair", [ PVariable ("a", _); PVariable ("b", _) ], _);
+              case_body = Binary { binary_op = OpAdd; _ };
+              _;
+            };
+          ];
+        _;
+      } ->
+      ()
+  | _ -> assert_failure "Expected multi-field constructor pattern"
+
+let test_adt_constructor_pattern_nested ctxt =
+  match parse_expr "match x { | Some(Some(n)) -> n | _ -> 0 }" with
+  | Match
+      {
+        cases =
+          [
+            {
+              pattern =
+                PConstructor
+                  ( "Some",
+                    [ PConstructor ("Some", [ PVariable ("n", _) ], _) ],
+                    _ );
+              _;
+            };
+            _;
+          ];
+        _;
+      } ->
+      ()
+  | _ -> assert_failure "Expected nested constructor pattern"
+
+let test_adt_constructor_pattern_with_wildcard ctxt =
+  match parse_expr "match x { | Some(_) -> 1 | None -> 0 }" with
+  | Match
+      {
+        cases =
+          [
+            { pattern = PConstructor ("Some", [ PWildcard _ ], _); _ };
+            { pattern = PVariable ("None", _); _ };
+          ];
+        _;
+      } ->
+      ()
+  | _ -> assert_failure "Expected constructor pattern with wildcard"
+
 let assert_error ~ctxt:_ ?(code = None) s =
   try
     check s;
@@ -1995,6 +2192,188 @@ let tc_poly_list_literal_annotation_mismatch ctxt =
   assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
     {|let xs: string list = [1, 2, 3]|}
 
+let tc_test_adt_simple ctxt =
+  assert_ok ~ctxt
+    {|data Color = { | Red | Green | Blue }
+      let c: Color = Red|}
+
+let tc_test_adt_constructor_with_field ctxt =
+  assert_ok ~ctxt
+    {|data Option = { | Some(int) | None }
+      let x: Option = Some(42)|}
+
+let tc_test_adt_constructor_wrong_arity ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_ArityMismatch)
+    {|data Option = { | Some(int) | None }
+      let x: Option = Some(1, 2)|}
+
+let tc_test_adt_constructor_wrong_field_type ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|data Option = { | Some(int) | None }
+      let x: Option = Some("oops")|}
+
+let tc_test_adt_match_constructor ctxt =
+  assert_ok ~ctxt
+    {|data Option = { | Some(int) | None }
+      let unwrap(o: Option) -> int {
+        match o {
+          | Some(n) -> n
+          | None    -> 0
+        }
+      }|}
+
+let tc_test_adt_match_branch_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_MatchBranchMismatch)
+    {|data Option = { | Some(int) | None }
+      let f(o: Option) -> int {
+        match o {
+          | Some(n) -> n
+          | None    -> "missing"
+        }
+      }|}
+
+let tc_test_adt_match_pattern_type_mismatch ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_PatternTypeMismatch)
+    {|data Option = { | Some(int) | None }
+      let f(x: int) -> int {
+        match x { | Some(n) -> n }
+      }|}
+
+let tc_test_adt_nested_constructor ctxt =
+  assert_ok ~ctxt
+    {|data Option = { | Some(int) | None }
+      let double_wrap(n: int) -> Option { Some(n) }
+      let x: Option = double_wrap(42)|}
+
+let tc_test_adt_result_type ctxt =
+  assert_ok ~ctxt
+    {|data Result = { | Ok(int) | Err(string) }
+      let safe_div(a: int, b: int) -> Result {
+        if b = 0 then Err("division by zero") else Ok(a / b)
+      }|}
+
+let tc_test_adt_recursive_match ctxt =
+  assert_ok ~ctxt
+    {|data Tree = { | Leaf | Node(int, Tree, Tree) }
+      let depth(t: Tree) -> int {
+        match t {
+          | Leaf           -> 0
+          | Node(_, l, r)  -> {
+              let ld = depth(l)
+              let rd = depth(r)
+              if ld > rd then ld + 1 else rd + 1
+            }
+        }
+      }|}
+
+let tc_test_adt_multi_field_pattern ctxt =
+  assert_ok ~ctxt
+    {|data Pair = { | Pair(int, int) }
+      let fst(p: Pair) -> int {
+        match p { | Pair(a, _) -> a }
+      }|}
+
+let tc_test_adt_undefined_constructor ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_UndefinedVariable)
+    {|data Option = { | Some(int) | None }
+      let x: Option = Missing(42)|}
+
+let tc_family_int_ops ctxt =
+  assert_ok ~ctxt {|let f(int[a, b]) -> int { a + b }
+      f(1, 2)|}
+
+let tc_family_float_ops ctxt =
+  assert_ok ~ctxt {|let f(float[a, b]) -> float { a + b }
+      f(1.0, 2.0)|}
+
+let tc_family_int_rejects_float ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let f(int[a, b]) -> int { a + b }
+      f(1.0, 2.0)|}
+
+let tc_family_float_rejects_int ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let f(float[a, b]) -> float { a + b }
+      f(1, 2)|}
+
+let tc_family_int_comparison ctxt =
+  assert_ok ~ctxt {|let is_pos(int[n]) -> bool { n > 0 }
+      is_pos(5)|}
+
+let tc_family_float_comparison ctxt =
+  assert_ok ~ctxt {|let is_pos(float[n]) -> bool { n > 0.0 }
+      is_pos(1.5)|}
+
+let tc_family_mixed_int_float_rejected ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let f(int[a]) -> int { a + 1 }
+      f(3.14)|}
+
+let tc_family_uniform_three_int ctxt =
+  assert_ok ~ctxt
+    {|let sum3(int[a, b, c]) -> int { a + b + c }
+      sum3(1, 2, 3)|}
+
+let tc_family_uniform_three_float ctxt =
+  assert_ok ~ctxt
+    {|let sum3(float[a, b, c]) -> float { a + b + c }
+      sum3(1.0, 2.0, 3.0)|}
+
+let tc_family_return_annotation_int ctxt =
+  assert_ok ~ctxt {|let double(int[x]) -> int { x + x }
+      double(21)|}
+
+let tc_family_return_annotation_float ctxt =
+  assert_ok ~ctxt {|let double(float[x]) -> float { x + x }
+      double(1.5)|}
+
+let tc_family_mixed_uniform_and_typed ctxt =
+  assert_ok ~ctxt
+    {|let f(int[a, b], s: string) -> int { a + b }
+      f(1, 2, "ignored")|}
+
+let tc_family_int_i32 ctxt =
+  assert_ok ~ctxt {|let f(x: i32) -> i32 { x + x }
+      f(10)|}
+
+let tc_family_int_i64 ctxt =
+  assert_ok ~ctxt {|let f(x: i64) -> i64 { x + x }
+      f(100)|}
+
+let tc_family_float_f32 ctxt =
+  assert_ok ~ctxt {|let f(x: f32) -> f32 { x + x }
+      f(1.0)|}
+
+let tc_family_float_f64 ctxt =
+  assert_ok ~ctxt {|let f(x: f64) -> f64 { x + x }
+      f(1.0)|}
+
+let tc_family_int_subtypes_no_mix ctxt =
+  assert_error ~ctxt ~code:(Some E_Type_TypeMismatch)
+    {|let f(x: i32, y: i64) -> i64 { x + y }|}
+
+let tc_family_in_recursive_function ctxt =
+  assert_ok ~ctxt
+    {|let sum(int[n]) -> int {
+        if n < 1 then 0 else n + sum(n - 1)
+      }
+      sum(10)|}
+
+let tc_family_in_match ctxt =
+  assert_ok ~ctxt
+    {|let classify(int[n]) -> string {
+        match n {
+          | 0 -> "zero"
+          | _ -> "nonzero"
+        }
+      }|}
+
+let tc_family_poly_with_family ctxt =
+  assert_ok ~ctxt
+    {|let add(int[a, b]) -> int { a + b }
+      let x: int = add(1, 2)
+      x|}
+
 let suite =
   "lunno tests"
   >::: [
@@ -2169,6 +2548,25 @@ let suite =
          >:: test_function_with_multiple_return_points;
          "[parser] function returning function"
          >:: test_function_returning_function;
+         "[parser] simple declaration" >:: test_adt_simple_declaration;
+         "[parser] single variant" >:: test_adt_single_variant;
+         "[parser] variant with fields" >:: test_adt_variant_with_fields;
+         "[parser] result type" >:: test_adt_result_type;
+         "[parser] multi field variant" >:: test_adt_multi_field_variant;
+         "[parser] multiple declarations" >:: test_adt_multiple_declarations;
+         "[parser] constructor expr" >:: test_adt_constructor_expr;
+         "[parser] constructor no args" >:: test_adt_constructor_no_args;
+         "[parser] constructor multiple args"
+         >:: test_adt_constructor_multiple_args;
+         "[parser] constructor nested" >:: test_adt_constructor_nested;
+         "[parser] constructor in let" >:: test_adt_constructor_in_let;
+         "[parser] constructor pattern" >:: test_adt_constructor_pattern;
+         "[parser] constructor pattern multi field"
+         >:: test_adt_constructor_pattern_multi_field;
+         "[parser] constructor pattern nested"
+         >:: test_adt_constructor_pattern_nested;
+         "[parser] constructor pattern wildcard"
+         >:: test_adt_constructor_pattern_with_wildcard;
          "[tc] int literal" >:: tc_test_int_literal;
          "[tc] float literal" >:: tc_test_float_literal;
          "[tc] string literal" >:: tc_test_string_literal;
@@ -2263,6 +2661,20 @@ let suite =
          "[tc] function return type" >:: tc_test_function_return_type;
          "[tc] primed name" >:: tc_test_primed_name;
          "[tc] double primed name" >:: tc_test_double_primed_name;
+         "[tc] simple" >:: tc_test_adt_simple;
+         "[tc] constructor with field" >:: tc_test_adt_constructor_with_field;
+         "[tc] constructor wrong arity" >:: tc_test_adt_constructor_wrong_arity;
+         "[tc] constructor wrong field type"
+         >:: tc_test_adt_constructor_wrong_field_type;
+         "[tc] match constructor" >:: tc_test_adt_match_constructor;
+         "[tc] match branch mismatch" >:: tc_test_adt_match_branch_mismatch;
+         "[tc] match pattern type mismatch"
+         >:: tc_test_adt_match_pattern_type_mismatch;
+         "[tc] nested constructor" >:: tc_test_adt_nested_constructor;
+         "[tc] result type" >:: tc_test_adt_result_type;
+         "[tc] recursive match" >:: tc_test_adt_recursive_match;
+         "[tc] multi field pattern" >:: tc_test_adt_multi_field_pattern;
+         "[tc] undefined constructor" >:: tc_test_adt_undefined_constructor;
          "[poly] identity int" >:: tc_poly_identity_int;
          "[poly] identity float" >:: tc_poly_identity_float;
          "[poly] identity string" >:: tc_poly_identity_string;
@@ -2325,6 +2737,29 @@ let suite =
          >:: tc_poly_list_literal_type_mismatch;
          "[poly] list literal annotation mismatch"
          >:: tc_poly_list_literal_annotation_mismatch;
+         "[family] int ops" >:: tc_family_int_ops;
+         "[family] float ops" >:: tc_family_float_ops;
+         "[family] int rejects float" >:: tc_family_int_rejects_float;
+         "[family] float rejects int" >:: tc_family_float_rejects_int;
+         "[family] int comparison" >:: tc_family_int_comparison;
+         "[family] float comparison" >:: tc_family_float_comparison;
+         "[family] mixed int float rejected"
+         >:: tc_family_mixed_int_float_rejected;
+         "[family] uniform three int" >:: tc_family_uniform_three_int;
+         "[family] uniform three float" >:: tc_family_uniform_three_float;
+         "[family] return annotation int" >:: tc_family_return_annotation_int;
+         "[family] return annotation float"
+         >:: tc_family_return_annotation_float;
+         "[family] mixed uniform and typed"
+         >:: tc_family_mixed_uniform_and_typed;
+         "[family] int i32" >:: tc_family_int_i32;
+         "[family] int i64" >:: tc_family_int_i64;
+         "[family] float f32" >:: tc_family_float_f32;
+         "[family] float f64" >:: tc_family_float_f64;
+         "[family] int subtypes no mix" >:: tc_family_int_subtypes_no_mix;
+         "[family] in recursive function" >:: tc_family_in_recursive_function;
+         "[family] in match" >:: tc_family_in_match;
+         "[family] poly with family" >:: tc_family_poly_with_family;
        ]
 
 let () = run_test_tt_main suite

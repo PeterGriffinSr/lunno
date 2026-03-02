@@ -1,16 +1,28 @@
+type family = FInt | FFloat
+
 type ty =
   | TyInt
+  | TyI8
+  | TyI16
+  | TyI32
+  | TyI64
   | TyFloat
+  | TyF32
+  | TyF64
   | TyString
   | TyBool
   | TyUnit
   | TyVar of string
+  | TyBoundVar of string * family
   | TyMeta of meta_var
+  | TyFamilyMeta of family_meta
   | TyList of ty
   | TyFunction of ty list * ty
   | TyModule of string * string
+  | TyAdt of string
 
 and meta_var = { id : int; contents : ty option ref }
+and family_meta = { fid : int; family : family; fcontents : ty option ref }
 
 type literal =
   | LInt of int64
@@ -22,6 +34,18 @@ type literal =
 
 type param = { param_name : string; param_ty : ty option; param_span : Span.t }
 type import = { module_ : string; item : string; import_span : Span.t }
+
+type variant = {
+  variant_name : string;
+  variant_fields : ty list;
+  variant_span : Span.t;
+}
+
+type type_decl = {
+  type_name : string;
+  variants : variant list;
+  type_span : Span.t;
+}
 
 type expr =
   | Literal of literal * Span.t
@@ -36,6 +60,7 @@ type expr =
   | Unary of unary_expr
   | MemberAccess of expr * string * Span.t
   | Range of expr * expr * Span.t
+  | Constructor of string * expr list * Span.t
 
 and lambda = {
   params : param list;
@@ -81,6 +106,7 @@ and pattern =
   | PBooleanLiteral of bool * Span.t
   | PNil of Span.t
   | PCons of pattern * pattern * Span.t
+  | PConstructor of string * pattern list * Span.t
 
 and binary_op =
   | OpAdd
@@ -118,5 +144,10 @@ let span_of_expr = function
   | Match { match_span = s; _ } -> s
   | MemberAccess (_, _, s) -> s
   | Range (_, _, s) -> s
+  | Constructor (_, _, s) -> s
 
-type program = { imports : import list; body : expr list }
+type program = {
+  imports : import list;
+  type_decls : type_decl list;
+  body : expr list;
+}

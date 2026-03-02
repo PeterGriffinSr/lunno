@@ -11,8 +11,15 @@
         "else", (fun span -> KwElse span);
         "match", (fun span -> KwMatch span);
         "import", (fun span -> KwImport span);
+        "data", (fun span -> KwData span);
         "int", (fun span -> IntegerType span);
+        "i8",    (fun span -> I8Type span);
+        "i16",   (fun span -> I16Type span);
+        "i32",   (fun span -> I32Type span);
+        "i64",   (fun span -> I64Type span);
         "float", (fun span -> FloatingPointType span);
+        "f32",   (fun span -> F32Type span);
+        "f64",   (fun span -> F64Type span);
         "string", (fun span -> StringType span);
         "bool", (fun span -> BooleanType span);
         "unit", (fun span -> UnitType span);

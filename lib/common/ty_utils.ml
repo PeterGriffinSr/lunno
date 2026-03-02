@@ -21,12 +21,16 @@ let rec resolve ty =
   match ty with
   | Ast.TyMeta { Ast.contents; _ } -> (
       match !contents with Some t -> resolve t | None -> ty)
+  | Ast.TyFamilyMeta { Ast.fcontents; _ } -> (
+      match !fcontents with Some t -> resolve t | None -> ty)
   | _ -> ty
 
 let generalize_display ty =
   let rec free_metas acc t =
     match resolve t with
     | Ast.TyMeta { Ast.id; _ } -> if List.mem id acc then acc else acc @ [ id ]
+    | Ast.TyFamilyMeta { Ast.fid; _ } ->
+        if List.mem fid acc then acc else acc @ [ fid ]
     | Ast.TyList t -> free_metas acc t
     | Ast.TyFunction (ps, r) -> free_metas (List.fold_left free_metas acc ps) r
     | _ -> acc
@@ -41,22 +45,41 @@ let generalize_display ty =
         match List.assoc_opt id mapping with
         | Some name -> Ast.TyVar name
         | None -> t)
+    | Ast.TyFamilyMeta { Ast.fid; Ast.family; _ } -> (
+        match List.assoc_opt fid mapping with
+        | Some name -> Ast.TyBoundVar (name, family)
+        | None -> (
+            match family with Ast.FInt -> Ast.TyI64 | Ast.FFloat -> Ast.TyF64))
     | Ast.TyList t -> Ast.TyList (go t)
     | Ast.TyFunction (ps, r) -> Ast.TyFunction (List.map go ps, go r)
-    | _ -> t
+    | t -> t
   in
   go ty
 
 let rec string_of_ty_inner = function
   | Ast.TyInt -> "int"
+  | Ast.TyI8 -> "i8"
+  | Ast.TyI16 -> "i16"
+  | Ast.TyI32 -> "i32"
+  | Ast.TyI64 -> "i64"
   | Ast.TyFloat -> "float"
+  | Ast.TyF32 -> "f32"
+  | Ast.TyF64 -> "f64"
   | Ast.TyString -> "string"
   | Ast.TyBool -> "bool"
   | Ast.TyUnit -> "unit"
   | Ast.TyVar v -> "'" ^ v
+  | Ast.TyBoundVar (name, family) ->
+      Printf.sprintf "'%s:%s" name
+        (match family with Ast.FInt -> "int" | Ast.FFloat -> "float")
   | Ast.TyMeta mv -> (
       match !(mv.Ast.contents) with
       | None -> Printf.sprintf "?%d" mv.Ast.id
+      | Some t -> string_of_ty_inner t)
+  | Ast.TyFamilyMeta fm -> (
+      match !(fm.Ast.fcontents) with
+      | None -> (
+          match fm.Ast.family with Ast.FInt -> "int" | Ast.FFloat -> "int")
       | Some t -> string_of_ty_inner t)
   | Ast.TyModule (namespace, name) -> namespace ^ ":" ^ name
   | Ast.TyList t -> Printf.sprintf "%s list" (string_of_ty_atom t)
@@ -67,6 +90,7 @@ let rec string_of_ty_inner = function
           Printf.sprintf "%s -> %s"
             (String.concat " -> " (List.map string_of_ty_atom args))
             (string_of_ty_inner ret))
+  | Ast.TyAdt name -> name
 
 and string_of_ty_atom ty =
   match ty with

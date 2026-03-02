@@ -75,7 +75,7 @@ let check_document uri source =
             ~severity:DiagnosticSeverity.Error ~message:(`String msg) ();
         ]
     with
-    | Lunno_common.Error.ParseError { msg; span; _ } ->
+    | Lunno_common.Error.ParserError { msg; span; _ } ->
         [
           Diagnostic.create ~range:(span_to_range span)
             ~severity:DiagnosticSeverity.Error ~message:(`String msg) ();
@@ -104,10 +104,7 @@ let rec collect_code_lenses acc expr =
           ~start:(Position.create ~line ~character:0)
           ~end_:(Position.create ~line ~character:0)
       in
-      let display_ty =
-        match let_body with Lambda { lambda_ty; _ } -> lambda_ty | _ -> let_ty
-      in
-      let label = string_of_ty_sig display_ty in
+      let label = string_of_ty_sig let_ty in
       let lens =
         CodeLens.create ~range
           ~command:(Command.create ~title:label ~command:"" ())
@@ -176,6 +173,25 @@ let extract_word_at_position lines line char_pos =
       (module_path, word)
     else ("", word)
 
+(* Collects all bindings with their types and spans, for position-aware lookup *)
+let rec collect_definitions_with_ty acc expr =
+  let open Lunno_common.Typed_ast in
+  match expr with
+  | Let { name; let_ty; let_span; let_body; _ } ->
+      let acc = (name, let_ty, let_span) :: acc in
+      collect_definitions_with_ty acc let_body
+  | Block (exprs, _, _) -> List.fold_left collect_definitions_with_ty acc exprs
+  | Lambda { params; lambda_body; _ } ->
+      let acc =
+        List.fold_left
+          (fun acc param ->
+            (param.param_name, param.param_ty, param.param_span) :: acc)
+          acc params
+      in
+      collect_definitions_with_ty acc lambda_body
+  | _ -> acc
+
+(* Collects all bindings as (name, type_string) pairs, for completion *)
 let rec collect_identifiers acc expr =
   let open Lunno_common.Typed_ast in
   match expr with
@@ -382,16 +398,30 @@ let handle_hover id (params : HoverParams.t) =
                           (Lunno_common.Ty_utils.string_of_ty ty))
                     |> String.concat "\n"
                   in
-                  make_hover (Printf.sprintf "%s" exports_str)
+                  make_hover exports_str
             else
-              let all_idents =
-                List.fold_left collect_identifiers []
+              (* Use position-aware lookup: find the last definition of `word`
+                 whose span starts at or before the cursor line. This correctly
+                 handles shadowing between e.g. a lambda param `x` in function
+                 `a` and a top-level `let x` defined later. *)
+              let cursor_line = line + 1 in
+              (* spans are 1-indexed *)
+              let all_defs =
+                List.fold_left collect_definitions_with_ty []
                   typed_prog.Lunno_common.Typed_ast.body
                 |> List.rev
               in
-              match List.assoc_opt word all_idents with
+              let best =
+                List.fold_left
+                  (fun acc (name, ty, (start_pos, _)) ->
+                    if name = word && start_pos.Lexing.pos_lnum <= cursor_line
+                    then Some ty
+                    else acc)
+                  None all_defs
+              in
+              match best with
               | None -> send_response id `Null
-              | Some ty_str -> make_hover ty_str))
+              | Some ty -> make_hover (string_of_ty_sig ty)))
 
 let rec collect_definitions acc expr =
   let open Lunno_common.Typed_ast in

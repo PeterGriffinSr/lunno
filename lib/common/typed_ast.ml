@@ -16,6 +16,7 @@ type expr =
   | Unary of unary_expr
   | MemberAccess of expr * string * ty * Span.t
   | Range of expr * expr * Span.t
+  | Constructor of string * expr list * ty * Span.t
 
 and lambda = {
   params : param list;
@@ -82,6 +83,7 @@ let ty_of = function
   | Binary { binary_ty; _ } -> binary_ty
   | Unary { unary_ty; _ } -> unary_ty
   | MemberAccess (_, _, ty, _) -> ty
+  | Constructor (_, _, ty, _) -> ty
   | Range _ -> Ast.TyList Ast.TyInt
 
 let span_of = function
@@ -96,6 +98,11 @@ let span_of = function
   | Binary { binary_span = s; _ } -> s
   | Unary { unary_span = s; _ } -> s
   | MemberAccess (_, _, _, s) -> s
+  | Constructor (_, _, _, s) -> s
   | Range (_, _, s) -> s
 
-type program = { imports : import list; body : expr list }
+type program = {
+  imports : import list;
+  type_decls : Ast.type_decl list;
+  body : expr list;
+}

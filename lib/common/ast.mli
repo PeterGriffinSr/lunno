@@ -1,18 +1,49 @@
+(** The [family] type represents the numeric family of a bound type variable,
+    used to constrain type variables to either integer or floating-point types.
+*)
+type family =
+  | FInt
+      (** Integer family, covering types such as [int], [i8], [i16], [i32], and
+          [i64]. *)
+  | FFloat
+      (** Floating-point family, covering types such as [float], [f32], and
+          [f64]. *)
+
 (** The [ty] type represents types in the language. *)
 type ty =
   | TyInt  (** Integer type. *)
+  | TyI8  (** Integer 8 type. *)
+  | TyI16  (** Interger 16 type. *)
+  | TyI32  (** Interger 32 type. *)
+  | TyI64  (** Interger 64 type. *)
   | TyFloat  (** Floating-point type. *)
+  | TyF32  (** Floating-point 32 type. *)
+  | TyF64  (** Floating-point 64 type. *)
   | TyString  (** String type. *)
   | TyBool  (** Boolean type. *)
   | TyUnit  (** Unit type. *)
   | TyVar of string  (** Type variable, e.g., 'a. *)
+  | TyBoundVar of string * family
+      (** Bound type variable constrained to a specific family, e.g., an integer
+          or float family. *)
   | TyMeta of meta_var  (** Meta type variable used during type inference. *)
+  | TyFamilyMeta of family_meta
+      (** Meta type family used during family type inference. *)
   | TyList of ty  (** List type, e.g., [int]. *)
   | TyFunction of ty list * ty  (** Function type, e.g., (int, int) -> int. *)
   | TyModule of string * string  (** Module type, e.g., std:io. *)
+  | TyAdt of string
+      (** Algebraic Data Types, e.g.,
+          {[
+            data Result = {! | Some('a) | None }
+          ]} *)
 
 and meta_var = { id : int; contents : ty option ref }
 (** The [meta_var] type represents a meta type variable used during type
+    inference. *)
+
+and family_meta = { fid : int; family : family; fcontents : ty option ref }
+(** The [family_meta] type represents a family meta type used furing type
     inference. *)
 
 (** The [literal] type represents literal values in the language. *)
@@ -30,6 +61,24 @@ type param = {
   param_span : Span.t;  (** Source code span of the parameter. *)
 }
 (** The [param] type represents a function parameter. *)
+
+type variant = {
+  variant_name : string;  (** Variant name, e.g., [Some] or [None]. *)
+  variant_fields : ty list;
+      (** The types of the fields carried by this variant. *)
+  variant_span : Span.t;  (** Source code span of the variant declaration. *)
+}
+(** The [variant] type represents constructors within algebraic data types. *)
+
+type type_decl = {
+  type_name : string;
+      (** The name of the algebraic data type being declared, e.g., [Result] or
+          [Option]. *)
+  variants : variant list;
+      (** The list of variants (constructors) that make up this type. *)
+  type_span : Span.t;  (** Source code span of the entire type declaration. *)
+}
+(** The [type_decl] type represents an algebraic data type. *)
 
 type import = {
   module_ : string;  (** The name of the module being imported. *)
@@ -53,12 +102,14 @@ type expr =
   | MemberAccess of expr * string * Span.t
       (** Member access, e.g., obj.field. *)
   | Range of expr * expr * Span.t  (** Range expression, e.g., [1..10]. *)
+  | Constructor of string * expr list * Span.t
+      (** ADT constructor application, e.g., [Some(x)] or [Ok(val)]. *)
 
 and lambda = {
   params : param list;  (** Parameters. *)
   ret_ty : ty option;  (** Optional return type annotation. *)
   lambda_body : expr;  (** Function body. *)
-  is_recursive : bool;
+  is_recursive : bool;  (** Flag for internal recursion. *)
   lambda_span : Span.t;  (** Span of the whole lambda. *)
 }
 (** The [lambda] type represents anonymous functions. *)
@@ -104,6 +155,8 @@ and pattern =
   | PBooleanLiteral of bool * Span.t  (** Boolean literal pattern. *)
   | PNil of Span.t  (** Empty list pattern []. *)
   | PCons of pattern * pattern * Span.t  (** Cons pattern (head :: tail). *)
+  | PConstructor of string * pattern list * Span.t
+      (** Constructor pattern, e.g., [Some(x)] or [Ok(v, msg)]. *)
 
 (** The [binary_op] type represents binary operators. *)
 and binary_op =
@@ -138,6 +191,12 @@ and unary_expr = {
 val span_of_expr : expr -> Span.t
 (** [span_of_expr e] returns the source span of expression [e]. *)
 
-type program = { imports : import list; body : expr list }
+type program = {
+  imports : import list;
+      (** The list of import declarations at the top of the program. *)
+  type_decls : type_decl list;
+      (** The list of algebraic data type declarations. *)
+  body : expr list;  (** The top-level expressions forming the program body. *)
+}
 (** The [program] type represents a sequence of expressions (the top-level
     program). *)

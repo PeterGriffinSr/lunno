@@ -41,7 +41,7 @@ exception
 (** Exception raised by the lexer on lexical errors. *)
 
 exception
-  ParseError of {
+  ParserError of {
     code : error_code;  (** The kind of syntax error. *)
     msg : string;  (** A human-readable error message. *)
     span : Span.t;  (** Span in the source where the error occurred. *)

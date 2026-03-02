@@ -1,6 +1,3 @@
-(** Typed AST produced by the typechecker. Every node carries a resolved [ty],
-    with no unresolved meta variables remaining after inference. *)
-
 type ty = Ast.ty
 (** Alias for [Ast.ty]. All types here are fully resolved — no [TyMeta] nodes
     with unfilled [contents] should appear after typechecking. *)
@@ -43,6 +40,9 @@ type expr =
   | Range of expr * expr * Span.t
       (** A range expression [a..b]. Both bounds must be [int] and the result is
           always [TyList TyInt]. *)
+  | Constructor of string * expr list * ty * Span.t
+      (** An ADT constructor application, e.g., [Some(x)] or [Ok(val)]. The [ty]
+          is the resolved type of the constructed value. *)
 
 and lambda = {
   params : param list;
@@ -52,14 +52,14 @@ and lambda = {
   is_recursive : bool;
       (** Whether the lambda refers to itself by name, enabling recursion. *)
   lambda_ty : ty;  (** The full [TyFunction] type of this lambda. *)
-  lambda_span : Span.t;
+  lambda_span : Span.t;  (** Source code span of the lambda expression. *)
 }
 
 and let_expr = {
   name : string;  (** The name being bound. *)
   let_ty : ty;  (** The resolved type of the bound expression. *)
   let_body : expr;  (** The expression being bound. *)
-  let_span : Span.t;
+  let_span : Span.t;  (** Source code span of the let binding. *)
 }
 
 and if_expr = {
@@ -70,7 +70,7 @@ and if_expr = {
   if_ty : ty;
       (** The resolved type of the if expression, equal to the type of both
           branches. *)
-  if_span : Span.t;
+  if_span : Span.t;  (** Source code span of the if expression. *)
 }
 
 and match_expr = {
@@ -80,7 +80,7 @@ and match_expr = {
   match_ty : ty;
       (** The resolved type of the match expression, equal to the type of all
           case bodies. *)
-  match_span : Span.t;
+  match_span : Span.t;  (** Source code span of the match expression. *)
 }
 
 and match_case = {
@@ -91,7 +91,7 @@ and match_case = {
       (** An optional guard expression that must have type [TyBool]. *)
   case_body : expr;
       (** The body expression evaluated when this case matches. *)
-  case_span : Span.t;
+  case_span : Span.t;  (** Source code span of this match case. *)
 }
 
 and binary_expr = {
@@ -99,14 +99,14 @@ and binary_expr = {
   left : expr;  (** The left operand. *)
   right : expr;  (** The right operand. *)
   binary_ty : ty;  (** The resolved result type of the operation. *)
-  binary_span : Span.t;
+  binary_span : Span.t;  (** Source code span of the binary expression. *)
 }
 
 and unary_expr = {
   unary_op : Ast.unary_op;  (** The unary operator. *)
   expr : expr;  (** The operand. *)
   unary_ty : ty;  (** The resolved result type of the operation. *)
-  unary_span : Span.t;
+  unary_span : Span.t;  (** Source code span of the unary expression. *)
 }
 
 val ty_of : expr -> ty
@@ -116,7 +116,14 @@ val ty_of : expr -> ty
 val span_of : expr -> Span.t
 (** Returns the source span of an expression. *)
 
-type program = { imports : import list; body : expr list }
+type program = {
+  imports : import list;
+      (** The list of import declarations at the top of the program. *)
+  type_decls : Ast.type_decl list;
+      (** The list of algebraic data type declarations, reused from [Ast]. *)
+  body : expr list;
+      (** The top-level typed expressions forming the program body. *)
+}
 (** A fully typed program, produced by the typechecker from an [Ast.program].
     All expressions in [body] carry resolved types with no remaining meta
     variables. *)

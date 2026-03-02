@@ -3,4 +3,5 @@ val infer_program : Lunno_common.Ast.program -> Lunno_common.Typed_ast.program
     first error encountered.
 
     @param program The AST program to infer types for.
-    @raise Error.TypeError Raised if a type error is encountered. *)
+    @raise Lunno_common.Error.TypeError Raised if a type error is encountered.
+*)

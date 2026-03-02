@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.10.0] - 2026-03-02
+
+### Added
+- Algebraic data types (ADTs) with `data` declarations and variant constructors.
+- Type family inference for numeric types (`FInt`, `FFloat`), allowing functions to be polymorphic over integer or floating-point families.
+- Parser and typechecker support for ADT constructor expressions and constructor patterns in match.
+- Comprehensive test suite for ADTs and type family inference covering parsing, typechecking, and error cases.
+
+### Changed
+- Updated public API (`lunno.mli`) with revised documentation and type signatures.
+
 ## [0.9.0] - 2026-02-26
 
 ### Added

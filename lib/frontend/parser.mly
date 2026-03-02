@@ -27,6 +27,7 @@
         | Unary { expr; _ } -> contains_variable name expr
         | MemberAccess (obj, _, _) -> contains_variable name obj
         | Range (e1, e2, _) -> contains_variable name e1 || contains_variable name e2
+        | Constructor (_, args, _) -> List.exists (contains_variable name) args
 
     let merge e1 e2 =
         let span_of = function
@@ -44,6 +45,7 @@
                     | Unary { unary_span; _ } -> unary_span
                     | MemberAccess (_, _, span) -> span
                     | Range (_, _, span) -> span
+                    | Constructor (_, _, span) -> span
                 end
             | `Span sp -> sp
             | `Pattern p ->
@@ -56,6 +58,7 @@
                     | PBooleanLiteral (_, sp) -> sp
                     | PNil sp -> sp
                     | PCons (_, _, sp) -> sp
+                    | PConstructor (_, _, sp) -> sp
                 end
         in
         let sp1 = span_of e1 in
@@ -77,8 +80,8 @@
 %token <unit * Lunno_common.Span.t> Unit
 %token <char * Lunno_common.Span.t> Quote
 
-%token <Lunno_common.Span.t> KwLet KwIf KwThen KwElse KwMatch KwImport
-%token <Lunno_common.Span.t> IntegerType FloatingPointType StringType BooleanType UnitType ListType
+%token <Lunno_common.Span.t> KwLet KwIf KwThen KwElse KwMatch KwImport KwData
+%token <Lunno_common.Span.t> IntegerType I8Type I16Type I32Type I64Type FloatingPointType F32Type F64Type StringType BooleanType UnitType ListType
 %token <Lunno_common.Span.t> LeftParen RightParen LeftBrace RightBrace LeftBracket RightBracket
 %token <Lunno_common.Span.t> Plus Minus Asterisk Slash Equal NotEqual Less Greater
 %token <Lunno_common.Span.t> Comma Colon Pipe Cons Arrow Underscore Dot DotDot
@@ -102,10 +105,14 @@
 %%
 
 program:
-    | import_list expr_list EndOfFile { { imports = $1; body = $2 } }
-    | import_list EndOfFile { { imports = $1; body = [] } }
-    | expr_list EndOfFile { { imports = []; body = $1 } }
-    | EndOfFile { { imports = []; body = [] } }
+    | import_list type_decl_list expr_list EndOfFile { { imports = $1; type_decls = $2; body = $3 } }
+    | import_list type_decl_list EndOfFile { { imports = $1; type_decls = $2; body = [] } }
+    | import_list expr_list EndOfFile { { imports = $1; type_decls = []; body = $2 } }
+    | import_list EndOfFile { { imports = $1; type_decls = []; body = [] } }
+    | type_decl_list expr_list EndOfFile { { imports = []; type_decls = $1; body = $2 } }
+    | type_decl_list EndOfFile { { imports = []; type_decls = $1; body = [] } }
+    | expr_list EndOfFile { { imports = []; type_decls = []; body = $1 } }
+    | EndOfFile { { imports = []; type_decls = []; body = [] } }
 
 import_list:
     | import import_list { $1 :: $2 }
@@ -119,6 +126,29 @@ import:
             { module_; item; import_span = merge (`Span $1) (`Span span) }
         | [] | [_] | _ :: _ :: _ :: _ -> assert false
     }
+
+type_decl_list:
+    | type_decl type_decl_list { $1 :: $2 }
+    | type_decl { [$1] }
+
+type_decl:
+    | KwData Identifier Equal LeftBrace variant_list RightBrace {
+        let (name, _) = $2 in { type_name = name; variants = $5; type_span = merge (`Span $1) (`Span $6) }
+    }
+
+variant_list:
+    | Pipe variant { [$2] }
+    | Pipe variant variant_list { $2 :: $3 }
+
+variant:
+    | Identifier { let (name, span) = $1 in { variant_name = name; variant_fields = []; variant_span = span } }
+    | Identifier LeftParen variant_field_list RightParen { 
+        let (name, span) = $1 in { variant_name = name; variant_fields = $3; variant_span = merge (`Span span) (`Span $4) } 
+    }
+
+variant_field_list:
+    | type_expr { [$1] }
+    | type_expr Comma variant_field_list { $1 :: $3 }
 
 expr_list:
     | expr expr_list { $1 :: $2 }
@@ -202,6 +232,10 @@ cons_pattern:
     | primary_pattern Cons cons_pattern { PCons ($1, $3, merge (`Pattern $1) (`Pattern $3)) }
     | primary_pattern { $1 }
 
+pattern_list:
+    | pattern { [$1] }
+    | pattern Comma pattern_list { $1 :: $3 }
+
 primary_pattern:
     | Underscore { PWildcard $1 }
     | Identifier { let (name, span) = $1 in PVariable (name, span) }
@@ -211,6 +245,14 @@ primary_pattern:
     | Boolean { let (b, span) = $1 in PBooleanLiteral (b, span) }
     | LeftBracket RightBracket { PNil (merge (`Span $1) (`Span $2)) }
     | LeftParen pattern RightParen { $2 }
+    | Identifier LeftParen RightParen {
+        let (name, span) = $1 in
+        PConstructor (name, [], merge (`Span span) (`Span $2))
+    }
+    | Identifier LeftParen pattern_list RightParen {
+        let (name, span) = $1 in
+        PConstructor (name, $3, merge (`Span span) (`Span $4))
+    }
 
 let_expr:
     | KwLet Identifier Equal expr {
@@ -271,12 +313,21 @@ ret_type:
 
 ret_type_primary:
     | Quote { let (c, _) = $1 in TyVar (String.make 1 c) }
-    | IntegerType { TyInt }
-    | FloatingPointType { TyFloat }
+    | IntegerType { TyFamilyMeta { fid = -1; family = FInt; fcontents = ref None } }
+    | I8Type { TyI8  }
+    | I16Type { TyI16 }
+    | I32Type { TyI32 }
+    | I64Type { TyI64 }
+    | FloatingPointType { TyFamilyMeta { fid = -1; family = FFloat; fcontents = ref None } }
+    | F32Type { TyF32 }
+    | F64Type { TyF64 }
     | StringType { TyString }
     | BooleanType { TyBool }
     | UnitType { TyUnit }
-    | Identifier { let (name, _) = $1 in TyVar name }
+    | Identifier { let (name, _) = $1 in
+        if String.length name > 0 && Char.uppercase_ascii name.[0] = name.[0]
+        then TyAdt name
+        else TyVar name }
     | ret_type_primary ListType { TyList $1 }
     | LeftParen ret_type RightParen { $2 }
 
@@ -291,12 +342,21 @@ type_expr:
 
 type_primary:
     | Quote { let (c, _) = $1 in TyVar (String.make 1 c) }
-    | IntegerType { TyInt }
-    | FloatingPointType { TyFloat }
+    | IntegerType { TyFamilyMeta { fid = -1; family = FInt; fcontents = ref None } }
+    | I8Type { TyI8  }
+    | I16Type { TyI16 }
+    | I32Type { TyI32 }
+    | I64Type { TyI64 }
+    | FloatingPointType { TyFamilyMeta { fid = -1; family = FFloat; fcontents = ref None } }
+    | F32Type { TyF32 }
+    | F64Type { TyF64 }
     | StringType { TyString }
     | BooleanType { TyBool }
     | UnitType { TyUnit }
-    | Identifier { let (name, _) = $1 in TyVar name }
+    | Identifier { let (name, _) = $1 in
+        if String.length name > 0 && Char.uppercase_ascii name.[0] = name.[0]
+        then TyAdt name
+        else TyVar name }
     | type_primary ListType { TyList $1 }
     | LeftParen type_expr RightParen { $2 }
 
@@ -315,12 +375,21 @@ param_list:
 
 param_type_primary:
     | Quote { let (c, _) = $1 in TyVar (String.make 1 c) }
-    | IntegerType { TyInt }
-    | FloatingPointType { TyFloat }
+    | IntegerType { TyFamilyMeta { fid = -1; family = FInt; fcontents = ref None } }
+    | I8Type { TyI8  }
+    | I16Type { TyI16 }
+    | I32Type { TyI32 }
+    | I64Type { TyI64 }
+    | FloatingPointType { TyFamilyMeta { fid = -1; family = FFloat; fcontents = ref None } }
+    | F32Type { TyF32 }
+    | F64Type { TyF64 }
     | StringType { TyString }
     | BooleanType { TyBool }
     | UnitType { TyUnit }
-    | Identifier { let (name, _) = $1 in TyVar name }
+    | Identifier { let (name, _) = $1 in
+        if String.length name > 0 && Char.uppercase_ascii name.[0] = name.[0]
+        then TyAdt name
+        else TyVar name }
     | param_type_primary ListType { TyList $1 }
     | LeftParen param_type RightParen { $2 }
 

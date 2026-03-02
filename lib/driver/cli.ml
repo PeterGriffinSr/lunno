@@ -37,7 +37,7 @@ let parse lexbuf lines =
           try Parser_errors.message state with Not_found -> "unexpected token"
         in
         let e =
-          Error.ParseError
+          Error.ParserError
             {
               code = Error.E_Parse_UnexpectedToken;
               msg = String.trim msg;

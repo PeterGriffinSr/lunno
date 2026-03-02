@@ -8,6 +8,6 @@ val token : Lexing.lexbuf -> Parser.token
 
     @param lexbuf The lexing buffer containing the input source code.
     @return The next token of type [Parser.token].
-    @raise Error.LexerError
+    @raise Lunno_common.Error.LexerError
       Raised if an invalid character, malformed number, or other lexical error
       is encountered. *)
