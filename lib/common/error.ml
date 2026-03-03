@@ -48,7 +48,7 @@ let string_of_code = function
   | E_Type_MissingMain -> "E3011"
   | E_Type_TopLevelExpression -> "E3012"
 
-let print_error (lines : string array) = function
+let print_error lines = function
   | LexerError { code; msg; span = start_pos, _ }
   | ParserError { code; msg; span = start_pos, _ }
   | TypeError { code; msg; span = start_pos, _ } ->

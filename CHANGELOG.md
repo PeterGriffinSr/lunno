@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.10.1] - 2026-03-03
+
+### Changed
+- Updated `parser_errors.ml` to support new parser errors.
+
 ## [0.10.0] - 2026-03-02
 
 ### Added

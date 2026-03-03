@@ -2,10 +2,8 @@ open Lsp
 open Lsp.Types
 open Jsonrpc
 
-let documents : (string, string) Hashtbl.t = Hashtbl.create 16
-
-let typed_asts : (string, Lunno_common.Typed_ast.program) Hashtbl.t =
-  Hashtbl.create 16
+let documents = Hashtbl.create 16
+let typed_asts = Hashtbl.create 16
 
 let send_packet packet =
   let json = Packet.yojson_of_t packet in
@@ -114,7 +112,7 @@ let rec collect_code_lenses acc expr =
   | Block (exprs, _, _) -> List.fold_left collect_code_lenses acc exprs
   | _ -> acc
 
-let handle_code_lens id (params : CodeLensParams.t) =
+let handle_code_lens id params =
   let uri = params.CodeLensParams.textDocument.TextDocumentIdentifier.uri in
   let uri_str = Uri.to_string uri in
   match Hashtbl.find_opt typed_asts uri_str with
@@ -173,7 +171,6 @@ let extract_word_at_position lines line char_pos =
       (module_path, word)
     else ("", word)
 
-(* Collects all bindings with their types and spans, for position-aware lookup *)
 let rec collect_definitions_with_ty acc expr =
   let open Lunno_common.Typed_ast in
   match expr with
@@ -191,7 +188,6 @@ let rec collect_definitions_with_ty acc expr =
       collect_definitions_with_ty acc lambda_body
   | _ -> acc
 
-(* Collects all bindings as (name, type_string) pairs, for completion *)
 let rec collect_identifiers acc expr =
   let open Lunno_common.Typed_ast in
   match expr with
@@ -230,7 +226,7 @@ let extract_imports source =
       else None)
     lines
 
-let handle_completion id (params : CompletionParams.t) =
+let handle_completion id params =
   let uri = params.CompletionParams.textDocument.TextDocumentIdentifier.uri in
   let uri_str = Uri.to_string uri in
   let position = params.CompletionParams.position in
@@ -336,7 +332,7 @@ let handle_completion id (params : CompletionParams.t) =
       let json = `List (List.map CompletionItem.yojson_of_t items) in
       send_response id json
 
-let handle_hover id (params : HoverParams.t) =
+let handle_hover id params =
   let uri = params.HoverParams.textDocument.TextDocumentIdentifier.uri in
   let uri_str = Uri.to_string uri in
   let position = params.HoverParams.position in
@@ -400,12 +396,7 @@ let handle_hover id (params : HoverParams.t) =
                   in
                   make_hover exports_str
             else
-              (* Use position-aware lookup: find the last definition of `word`
-                 whose span starts at or before the cursor line. This correctly
-                 handles shadowing between e.g. a lambda param `x` in function
-                 `a` and a top-level `let x` defined later. *)
               let cursor_line = line + 1 in
-              (* spans are 1-indexed *)
               let all_defs =
                 List.fold_left collect_definitions_with_ty []
                   typed_prog.Lunno_common.Typed_ast.body
@@ -439,7 +430,7 @@ let rec collect_definitions acc expr =
       collect_definitions acc lambda_body
   | _ -> acc
 
-let handle_goto_definition id (params : DefinitionParams.t) =
+let handle_goto_definition id params =
   let uri = params.DefinitionParams.textDocument.TextDocumentIdentifier.uri in
   let uri_str = Uri.to_string uri in
   let position = params.DefinitionParams.position in
@@ -484,7 +475,7 @@ let handle_initialize id _params =
   in
   send_response id (InitializeResult.yojson_of_t result)
 
-let handle_did_open (params : DidOpenTextDocumentParams.t) =
+let handle_did_open params =
   let uri =
     params.DidOpenTextDocumentParams.textDocument.TextDocumentItem.uri
   in
@@ -494,7 +485,7 @@ let handle_did_open (params : DidOpenTextDocumentParams.t) =
   Hashtbl.replace documents (Uri.to_string uri) source;
   check_document uri source
 
-let handle_did_change (params : DidChangeTextDocumentParams.t) =
+let handle_did_change params =
   let uri =
     params.DidChangeTextDocumentParams.textDocument
       .VersionedTextDocumentIdentifier.uri
@@ -506,7 +497,7 @@ let handle_did_change (params : DidChangeTextDocumentParams.t) =
       Hashtbl.replace documents (Uri.to_string uri) source;
       check_document uri source
 
-let handle_did_close (params : DidCloseTextDocumentParams.t) =
+let handle_did_close params =
   let uri =
     params.DidCloseTextDocumentParams.textDocument.TextDocumentIdentifier.uri
   in
@@ -529,7 +520,7 @@ let dispatch_request raw_req =
           handle_goto_definition id params
       | _ -> send_response id `Null)
 
-let dispatch_notification (notif : Client_notification.t) =
+let dispatch_notification notif =
   match notif with
   | Client_notification.TextDocumentDidOpen params -> handle_did_open params
   | Client_notification.TextDocumentDidChange params -> handle_did_change params
