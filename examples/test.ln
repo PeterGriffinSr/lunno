@@ -1,5 +1,9 @@
 import "core:io"
 
+let a(f, x) {
+    f(x :: [1, 2])
+}
+
 let main {
     let x = 10
     match x {

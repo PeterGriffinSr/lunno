@@ -39,7 +39,140 @@ let rec dump_pattern ?(indent = 0) = function
         (Ty_utils.string_of_span sp);
       List.iter (dump_pattern ~indent:(indent + 2)) fields
 
-and dump_expr ?(indent = 0) e =
+let dump_import imp =
+  Printf.printf "Import(\"%s:%s\") %s\n" imp.Ast.module_ imp.Ast.item
+    (Ty_utils.string_of_span imp.Ast.import_span)
+
+let dump_type_decl td =
+  Printf.printf "Data(%s) %s\n" td.Ast.type_name
+    (Ty_utils.string_of_span td.Ast.type_span);
+  List.iter
+    (fun (v : Ast.variant) ->
+      match v.Ast.variant_fields with
+      | [] -> Printf.printf "  | %s\n" v.Ast.variant_name
+      | fields ->
+          Printf.printf "  | %s(%s)\n" v.Ast.variant_name
+            (String.concat ", " (List.map Ty_utils.string_of_ty fields)))
+    td.Ast.variants
+
+let rec dump_untyped_expr ?(indent = 0) e =
+  let pad = String.make indent ' ' in
+  match e with
+  | Ast.Literal (lit, sp) -> (
+      match lit with
+      | Ast.LInt i ->
+          Printf.printf "%sInt(%Ld) %s\n" pad i (Ty_utils.string_of_span sp)
+      | Ast.LFloat f ->
+          Printf.printf "%sFloat(%g) %s\n" pad f (Ty_utils.string_of_span sp)
+      | Ast.LString s ->
+          Printf.printf "%sString(%S) %s\n" pad s (Ty_utils.string_of_span sp)
+      | Ast.LBool b ->
+          Printf.printf "%sBool(%b) %s\n" pad b (Ty_utils.string_of_span sp)
+      | Ast.LUnit ->
+          Printf.printf "%sUnit %s\n" pad (Ty_utils.string_of_span sp)
+      | Ast.LNil -> Printf.printf "%sNil %s\n" pad (Ty_utils.string_of_span sp))
+  | Ast.Variable (name, sp) ->
+      let first = name.[0] in
+      if Char.code first >= 65 && Char.code first <= 90 then
+        Printf.printf "%sConstructor(%s) %s\n" pad name
+          (Ty_utils.string_of_span sp)
+      else Printf.printf "%sVar(%s) %s\n" pad name (Ty_utils.string_of_span sp)
+  | Ast.Binary { Ast.binary_op; Ast.left; Ast.right; Ast.binary_span } ->
+      Printf.printf "%sBinary(%s) %s\n" pad
+        (Ty_utils.string_of_binop binary_op)
+        (Ty_utils.string_of_span binary_span);
+      dump_untyped_expr ~indent:(indent + 2) left;
+      dump_untyped_expr ~indent:(indent + 2) right
+  | Ast.Unary { Ast.unary_op; Ast.expr; Ast.unary_span } ->
+      Printf.printf "%sUnary(%s) %s\n" pad
+        (Ty_utils.string_of_unop unary_op)
+        (Ty_utils.string_of_span unary_span);
+      dump_untyped_expr ~indent:(indent + 2) expr
+  | Ast.Let { Ast.name; Ast.let_body; Ast.let_span; _ } ->
+      Printf.printf "%sLet(%s) %s\n" pad name (Ty_utils.string_of_span let_span);
+      dump_untyped_expr ~indent:(indent + 2) let_body
+  | Ast.Lambda
+      { Ast.params; Ast.lambda_body; Ast.is_recursive; Ast.lambda_span; _ } ->
+      let params_str =
+        String.concat ", "
+          (List.map (fun (p : Ast.param) -> p.Ast.param_name) params)
+      in
+      let rec_str = if is_recursive then " [recursive]" else "" in
+      (match params with
+      | [] ->
+          Printf.printf "%sLambda()%s %s\n" pad rec_str
+            (Ty_utils.string_of_span lambda_span)
+      | _ ->
+          Printf.printf "%sLambda(%s)%s %s\n" pad params_str rec_str
+            (Ty_utils.string_of_span lambda_span));
+      dump_untyped_expr ~indent:(indent + 2) lambda_body
+  | Ast.If { Ast.cond; Ast.then_; Ast.else_; Ast.if_span } -> (
+      Printf.printf "%sIf %s\n" pad (Ty_utils.string_of_span if_span);
+      dump_untyped_expr ~indent:(indent + 2) cond;
+      Printf.printf "%sThen:\n" (String.make (indent + 2) ' ');
+      dump_untyped_expr ~indent:(indent + 4) then_;
+      match else_ with
+      | Some e ->
+          Printf.printf "%sElse:\n" (String.make (indent + 2) ' ');
+          dump_untyped_expr ~indent:(indent + 4) e
+      | None -> ())
+  | Ast.Match { Ast.scrutinee; Ast.cases; Ast.match_span } ->
+      Printf.printf "%sMatch %s\n" pad (Ty_utils.string_of_span match_span);
+      dump_untyped_expr ~indent:(indent + 2) scrutinee;
+      List.iter
+        (fun (c : Ast.match_case) ->
+          Printf.printf "%s  Case:\n" pad;
+          dump_pattern ~indent:(indent + 4) c.Ast.pattern;
+          (match c.Ast.guard with
+          | Some g -> dump_untyped_expr ~indent:(indent + 4) g
+          | None -> ());
+          dump_untyped_expr ~indent:(indent + 4) c.Ast.case_body)
+        cases
+  | Ast.Block (exprs, span) ->
+      Printf.printf "%sBlock %s\n" pad (Ty_utils.string_of_span span);
+      List.iter (dump_untyped_expr ~indent:(indent + 2)) exprs
+  | Ast.Apply (f, args, span) -> (
+      match f with
+      | Ast.Variable (name, _) ->
+          Printf.printf "%sApply(%s) with %d arg(s) %s\n" pad name
+            (List.length args)
+            (Ty_utils.string_of_span span);
+          List.iteri
+            (fun i arg ->
+              Printf.printf "%s  [%d]:\n" pad i;
+              dump_untyped_expr ~indent:(indent + 4) arg)
+            args
+      | _ ->
+          Printf.printf "%sApply %s\n" pad (Ty_utils.string_of_span span);
+          Printf.printf "%s  Function:\n" pad;
+          dump_untyped_expr ~indent:(indent + 4) f;
+          Printf.printf "%s  Arguments (%d):\n" pad (List.length args);
+          List.iteri
+            (fun i arg ->
+              Printf.printf "%s    [%d]:\n" pad i;
+              dump_untyped_expr ~indent:(indent + 6) arg)
+            args)
+  | Ast.MemberAccess (obj, member, span) ->
+      Printf.printf "%sMemberAccess(.%s) %s\n" pad member
+        (Ty_utils.string_of_span span);
+      Printf.printf "%s  Object:\n" pad;
+      dump_untyped_expr ~indent:(indent + 4) obj
+  | Ast.Range (start_expr, end_expr, span) ->
+      Printf.printf "%sRange %s\n" pad (Ty_utils.string_of_span span);
+      Printf.printf "%s  Start:\n" pad;
+      dump_untyped_expr ~indent:(indent + 4) start_expr;
+      Printf.printf "%s  End:\n" pad;
+      dump_untyped_expr ~indent:(indent + 4) end_expr
+  | Ast.Constructor (name, args, span) ->
+      Printf.printf "%sConstructor(%s) %s\n" pad name
+        (Ty_utils.string_of_span span);
+      List.iteri
+        (fun i arg ->
+          Printf.printf "%s  [%d]:\n" pad i;
+          dump_untyped_expr ~indent:(indent + 4) arg)
+        args
+
+let rec dump_typed_expr ?(indent = 0) e =
   let pad = String.make indent ' ' in
   match e with
   | Typed_ast.Literal (lit, ty, sp) -> (
@@ -84,8 +217,8 @@ and dump_expr ?(indent = 0) e =
         (Ty_utils.string_of_binop binary_op)
         (Ty_utils.string_of_ty binary_ty)
         (Ty_utils.string_of_span binary_span);
-      dump_expr ~indent:(indent + 2) left;
-      dump_expr ~indent:(indent + 2) right
+      dump_typed_expr ~indent:(indent + 2) left;
+      dump_typed_expr ~indent:(indent + 2) right
   | Typed_ast.Unary
       {
         Typed_ast.unary_op;
@@ -97,7 +230,7 @@ and dump_expr ?(indent = 0) e =
         (Ty_utils.string_of_unop unary_op)
         (Ty_utils.string_of_ty unary_ty)
         (Ty_utils.string_of_span unary_span);
-      dump_expr ~indent:(indent + 2) expr
+      dump_typed_expr ~indent:(indent + 2) expr
   | Typed_ast.Let
       {
         Typed_ast.name;
@@ -108,7 +241,7 @@ and dump_expr ?(indent = 0) e =
       Printf.printf "%sLet(%s : %s) %s\n" pad name
         (Ty_utils.string_of_ty let_ty)
         (Ty_utils.string_of_span let_span);
-      dump_expr ~indent:(indent + 2) let_body
+      dump_typed_expr ~indent:(indent + 2) let_body
   | Typed_ast.Lambda
       {
         Typed_ast.params;
@@ -137,7 +270,7 @@ and dump_expr ?(indent = 0) e =
           Printf.printf "%sLambda(%s -> %s)%s %s\n" pad params_str ret_str
             rec_str
             (Ty_utils.string_of_span lambda_span));
-      dump_expr ~indent:(indent + 2) lambda_body
+      dump_typed_expr ~indent:(indent + 2) lambda_body
   | Typed_ast.If
       {
         Typed_ast.cond;
@@ -149,13 +282,13 @@ and dump_expr ?(indent = 0) e =
       Printf.printf "%sIf : %s %s\n" pad
         (Ty_utils.string_of_ty if_ty)
         (Ty_utils.string_of_span if_span);
-      dump_expr ~indent:(indent + 2) cond;
+      dump_typed_expr ~indent:(indent + 2) cond;
       Printf.printf "%sThen:\n" (String.make (indent + 2) ' ');
-      dump_expr ~indent:(indent + 4) then_;
+      dump_typed_expr ~indent:(indent + 4) then_;
       match else_ with
       | Some e ->
           Printf.printf "%sElse:\n" (String.make (indent + 2) ' ');
-          dump_expr ~indent:(indent + 4) e
+          dump_typed_expr ~indent:(indent + 4) e
       | None -> ())
   | Typed_ast.Match
       {
@@ -167,20 +300,20 @@ and dump_expr ?(indent = 0) e =
       Printf.printf "%sMatch : %s %s\n" pad
         (Ty_utils.string_of_ty match_ty)
         (Ty_utils.string_of_span match_span);
-      dump_expr ~indent:(indent + 2) scrutinee;
+      dump_typed_expr ~indent:(indent + 2) scrutinee;
       List.iter
         (fun (c : Typed_ast.match_case) ->
           Printf.printf "%s  Case:\n" pad;
           dump_pattern ~indent:(indent + 4) c.Typed_ast.pattern;
           (match c.Typed_ast.guard with
-          | Some g -> dump_expr ~indent:(indent + 4) g
+          | Some g -> dump_typed_expr ~indent:(indent + 4) g
           | None -> ());
-          dump_expr ~indent:(indent + 4) c.Typed_ast.case_body)
+          dump_typed_expr ~indent:(indent + 4) c.Typed_ast.case_body)
         cases
   | Typed_ast.Block (exprs, ty, span) ->
       Printf.printf "%sBlock : %s %s\n" pad (Ty_utils.string_of_ty ty)
         (Ty_utils.string_of_span span);
-      List.iter (dump_expr ~indent:(indent + 2)) exprs
+      List.iter (dump_typed_expr ~indent:(indent + 2)) exprs
   | Typed_ast.Apply (f, args, ty, span) -> (
       match f with
       | Typed_ast.Variable (name, _, _) ->
@@ -190,7 +323,7 @@ and dump_expr ?(indent = 0) e =
           List.iteri
             (fun i arg ->
               Printf.printf "%s  [%d]:\n" pad i;
-              dump_expr ~indent:(indent + 4) arg)
+              dump_typed_expr ~indent:(indent + 4) arg)
             args
       | Typed_ast.Lambda _ | Typed_ast.Apply _ | Typed_ast.Let _
       | Typed_ast.If _ | Typed_ast.Match _ | Typed_ast.Block _
@@ -200,26 +333,26 @@ and dump_expr ?(indent = 0) e =
           Printf.printf "%sApply : %s %s\n" pad (Ty_utils.string_of_ty ty)
             (Ty_utils.string_of_span span);
           Printf.printf "%s  Function:\n" pad;
-          dump_expr ~indent:(indent + 4) f;
+          dump_typed_expr ~indent:(indent + 4) f;
           Printf.printf "%s  Arguments (%d):\n" pad (List.length args);
           List.iteri
             (fun i arg ->
               Printf.printf "%s    [%d]:\n" pad i;
-              dump_expr ~indent:(indent + 6) arg)
+              dump_typed_expr ~indent:(indent + 6) arg)
             args)
   | Typed_ast.MemberAccess (obj, member, ty, span) ->
       Printf.printf "%sMemberAccess(.%s) : %s %s\n" pad member
         (Ty_utils.string_of_ty ty)
         (Ty_utils.string_of_span span);
       Printf.printf "%s  Object:\n" pad;
-      dump_expr ~indent:(indent + 4) obj
+      dump_typed_expr ~indent:(indent + 4) obj
   | Typed_ast.Range (start_expr, end_expr, span) ->
       Printf.printf "%sRange : List[int] %s\n" pad
         (Ty_utils.string_of_span span);
       Printf.printf "%s  Start:\n" pad;
-      dump_expr ~indent:(indent + 4) start_expr;
+      dump_typed_expr ~indent:(indent + 4) start_expr;
       Printf.printf "%s  End:\n" pad;
-      dump_expr ~indent:(indent + 4) end_expr
+      dump_typed_expr ~indent:(indent + 4) end_expr
   | Typed_ast.Constructor (name, args, ty, span) ->
       Printf.printf "%sConstructor(%s) : %s %s\n" pad name
         (Ty_utils.string_of_ty ty)
@@ -227,26 +360,15 @@ and dump_expr ?(indent = 0) e =
       List.iteri
         (fun i arg ->
           Printf.printf "%s  [%d]:\n" pad i;
-          dump_expr ~indent:(indent + 4) arg)
+          dump_typed_expr ~indent:(indent + 4) arg)
         args
 
-let dump_import imp =
-  Printf.printf "Import(\"%s:%s\") %s\n" imp.Ast.module_ imp.Ast.item
-    (Ty_utils.string_of_span imp.Ast.import_span)
+let dump_program_untyped prog =
+  List.iter dump_import prog.Ast.imports;
+  List.iter dump_type_decl prog.Ast.type_decls;
+  List.iter (dump_untyped_expr ~indent:0) prog.Ast.body
 
-let dump_type_decl td =
-  Printf.printf "Data(%s) %s\n" td.Ast.type_name
-    (Ty_utils.string_of_span td.Ast.type_span);
-  List.iter
-    (fun (v : Ast.variant) ->
-      match v.Ast.variant_fields with
-      | [] -> Printf.printf "  | %s\n" v.Ast.variant_name
-      | fields ->
-          Printf.printf "  | %s(%s)\n" v.Ast.variant_name
-            (String.concat ", " (List.map Ty_utils.string_of_ty fields)))
-    td.Ast.variants
-
-let dump_program prog =
+let dump_program_typed prog =
   List.iter dump_import prog.Typed_ast.imports;
   List.iter dump_type_decl prog.Typed_ast.type_decls;
-  List.iter (dump_expr ~indent:0) prog.Typed_ast.body
+  List.iter (dump_typed_expr ~indent:0) prog.Typed_ast.body

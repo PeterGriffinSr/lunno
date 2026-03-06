@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.10.2] - 2026-03-06
+
+### Changed
+- Updated `Debug` to support both untyped and typed AST.
+- Updated `Flag` to use cmdliner instead of standard Arg.
+
 ## [0.10.1] - 2026-03-03
 
 ### Changed

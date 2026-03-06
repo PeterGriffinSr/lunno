@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.10.1)
+(version 0.10.2)
 
 (generate_opam_files true)
 
@@ -37,6 +37,8 @@
    (>= 1.25.0))
   (menhir
    (>= 20260209))
+  (cmdliner
+    (>= 2.1.0))
   (ounit2
    (and
     :with-test

@@ -1,12 +1,18 @@
 open Lunno
 
+let process_file dump_mode filename =
+  let lines, prog = parse_file filename in
+  match dump_mode with
+  | Some Flags.DumpUntyped -> Debug.dump_program_untyped prog
+  | Some Flags.DumpTyped ->
+      Debug.dump_program_typed (typecheck_program lines prog)
+  | None ->
+      let _ = typecheck_program lines prog in
+      Printf.eprintf "error: compilation not yet implemented\n%!";
+      exit 1
+
 let () =
-  if Array.length Sys.argv > 1 && Sys.argv.(1) = "lsp" then run_lsp ()
-  else
-    let flags = Flags.parse Sys.argv in
-    List.iter
-      (fun filename ->
-        let lines, prog = parse_file filename in
-        let typed_prog = typecheck_program lines prog in
-        if flags.Flags.dump_program then Debug.dump_program typed_prog)
-      flags.Flags.files
+  let { Flags.subcommand; dump_mode; files } = Flags.parse Sys.argv in
+  match subcommand with
+  | Some Flags.Lsp -> run_lsp ()
+  | None -> List.iter (process_file dump_mode) files
