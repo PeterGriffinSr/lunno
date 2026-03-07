@@ -4,7 +4,7 @@ let string_of_binop = function
   | Ast.OpMul -> "*"
   | Ast.OpDiv -> "/"
   | Ast.OpEqual -> "=="
-  | Ast.OpNotEqual -> "!="
+  | Ast.OpNotEqual -> "<>"
   | Ast.OpLess -> "<"
   | Ast.OpGreater -> ">"
   | Ast.OpCons -> "::"
@@ -23,7 +23,11 @@ let rec resolve ty =
       match !contents with Some t -> resolve t | None -> ty)
   | Ast.TyFamilyMeta { Ast.fcontents; _ } -> (
       match !fcontents with Some t -> resolve t | None -> ty)
-  | _ -> ty
+  | Ast.TyInt | Ast.TyI8 | Ast.TyI16 | Ast.TyI32 | Ast.TyI64 | Ast.TyFloat
+  | Ast.TyF32 | Ast.TyF64 | Ast.TyString | Ast.TyBool | Ast.TyUnit
+  | Ast.TyList _ | Ast.TyFunction _ | Ast.TyVar _ | Ast.TyBoundVar _
+  | Ast.TyModule _ | Ast.TyAdt _ ->
+      ty
 
 let generalize_display ty =
   let rec free_metas acc t =
@@ -33,7 +37,10 @@ let generalize_display ty =
         if List.mem fid acc then acc else acc @ [ fid ]
     | Ast.TyList t -> free_metas acc t
     | Ast.TyFunction (ps, r) -> free_metas (List.fold_left free_metas acc ps) r
-    | _ -> acc
+    | Ast.TyInt | Ast.TyI8 | Ast.TyI16 | Ast.TyI32 | Ast.TyI64 | Ast.TyFloat
+    | Ast.TyF32 | Ast.TyF64 | Ast.TyString | Ast.TyBool | Ast.TyUnit
+    | Ast.TyVar _ | Ast.TyBoundVar _ | Ast.TyModule _ | Ast.TyAdt _ ->
+        acc
   in
   let metas = free_metas [] ty in
   let mapping =
@@ -52,7 +59,10 @@ let generalize_display ty =
             match family with Ast.FInt -> Ast.TyI64 | Ast.FFloat -> Ast.TyF64))
     | Ast.TyList t -> Ast.TyList (go t)
     | Ast.TyFunction (ps, r) -> Ast.TyFunction (List.map go ps, go r)
-    | t -> t
+    | Ast.TyInt | Ast.TyI8 | Ast.TyI16 | Ast.TyI32 | Ast.TyI64 | Ast.TyFloat
+    | Ast.TyF32 | Ast.TyF64 | Ast.TyString | Ast.TyBool | Ast.TyUnit
+    | Ast.TyVar _ | Ast.TyBoundVar _ | Ast.TyModule _ | Ast.TyAdt _ ->
+        t
   in
   go ty
 
@@ -79,7 +89,7 @@ let rec string_of_ty_inner = function
   | Ast.TyFamilyMeta fm -> (
       match !(fm.Ast.fcontents) with
       | None -> (
-          match fm.Ast.family with Ast.FInt -> "int" | Ast.FFloat -> "int")
+          match fm.Ast.family with Ast.FInt -> "int" | Ast.FFloat -> "float")
       | Some t -> string_of_ty_inner t)
   | Ast.TyModule (namespace, name) -> namespace ^ ":" ^ name
   | Ast.TyList t -> Printf.sprintf "%s list" (string_of_ty_atom t)
@@ -95,6 +105,10 @@ let rec string_of_ty_inner = function
 and string_of_ty_atom ty =
   match ty with
   | Ast.TyFunction _ -> Printf.sprintf "(%s)" (string_of_ty_inner ty)
-  | _ -> string_of_ty_inner ty
+  | Ast.TyFamilyMeta _ | Ast.TyMeta _ | Ast.TyInt | Ast.TyI8 | Ast.TyI16
+  | Ast.TyI32 | Ast.TyI64 | Ast.TyFloat | Ast.TyF32 | Ast.TyF64 | Ast.TyString
+  | Ast.TyBool | Ast.TyUnit | Ast.TyList _ | Ast.TyVar _ | Ast.TyBoundVar _
+  | Ast.TyModule _ | Ast.TyAdt _ ->
+      string_of_ty_inner ty
 
 let string_of_ty ty = string_of_ty_inner (generalize_display ty)

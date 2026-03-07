@@ -142,7 +142,9 @@ let rec dump_untyped_expr ?(indent = 0) e =
               Printf.printf "%s  [%d]:\n" pad i;
               dump_untyped_expr ~indent:(indent + 4) arg)
             args
-      | _ ->
+      | Ast.Lambda _ | Ast.Apply _ | Ast.Let _ | Ast.If _ | Ast.Match _
+      | Ast.Block _ | Ast.Binary _ | Ast.Unary _ | Ast.Literal _
+      | Ast.MemberAccess _ | Ast.Range _ | Ast.Constructor _ ->
           Printf.printf "%sApply %s\n" pad (Ty_utils.string_of_span span);
           Printf.printf "%s  Function:\n" pad;
           dump_untyped_expr ~indent:(indent + 4) f;

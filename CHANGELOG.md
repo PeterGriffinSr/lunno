@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.10.3] - 2026-03-07
+
+### Changed
+- Replaced exception-based error handling with sum types.
+
+### Fixed
+- Polymorphic types being monomorphized to `unit` instead of `'a`.
+- Fixed numerous compiler warnings.
+
+### Removed
+- `Env` module, functionality absorbed into the typechecker.
+
 ## [0.10.2] - 2026-03-06
 
 ### Changed

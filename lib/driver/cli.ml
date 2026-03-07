@@ -1,6 +1,7 @@
 open Lunno_frontend
 open Lunno_lower
 open Lunno_common
+open Parser.MenhirInterpreter
 
 let read_file_lines filename =
   try
@@ -18,42 +19,31 @@ let read_file_lines filename =
     Printf.eprintf "Error: could not read file '%s': %s\n%!" filename msg;
     exit 1
 
-let parse lexbuf lines =
-  let module I = Parser.MenhirInterpreter in
-  let supplier = I.lexer_lexbuf_to_supplier Lexer.token lexbuf in
+let parse lexbuf =
+  let supplier = lexer_lexbuf_to_supplier Lexer.token lexbuf in
   let checkpoint = Parser.Incremental.program lexbuf.Lexing.lex_curr_p in
   let rec loop checkpoint =
     match checkpoint with
-    | I.InputNeeded _ ->
-        let checkpoint = I.offer checkpoint (supplier ()) in
+    | InputNeeded _ ->
+        let checkpoint = offer checkpoint (supplier ()) in
         loop checkpoint
-    | I.Shifting _ | I.AboutToReduce _ -> loop (I.resume checkpoint)
-    | I.Accepted v -> v
-    | I.Rejected -> exit 1
-    | I.HandlingError env ->
+    | Shifting _ | AboutToReduce _ -> loop (resume checkpoint)
+    | Accepted v -> Ok v
+    | Rejected ->
         let pos = lexbuf.Lexing.lex_start_p in
-        let state = I.current_state_number env in
+        Error.parse_error Error.E_Parse_UnexpectedToken "rejected" (pos, pos)
+    | HandlingError env ->
+        let pos = lexbuf.Lexing.lex_start_p in
+        let state = current_state_number env in
         let msg =
           try Parser_errors.message state with Not_found -> "unexpected token"
         in
-        let e =
-          Error.ParserError
-            {
-              code = Error.E_Parse_UnexpectedToken;
-              msg = String.trim msg;
-              span = (pos, pos);
-            }
-        in
-        Error.print_error lines e;
-        exit 1
+        Error.parse_error Error.E_Parse_UnexpectedToken (String.trim msg)
+          (pos, pos)
   in
-  try loop checkpoint
-  with Error.LexerError _ as e ->
-    Error.print_error lines e;
-    exit 1
+  match loop checkpoint with
+  | Ok _ as ok -> ok
+  | Error _ as err -> err
+  | exception Lexer.LexError e -> Error e
 
-let typecheck program lines =
-  try Typechecker.infer_program program
-  with Error.TypeError _ as e ->
-    Error.print_error lines e;
-    exit 1
+let typecheck program = Typechecker.infer_program program

@@ -53,37 +53,24 @@ let publish_diagnostics uri diagnostics =
   let params = PublishDiagnosticsParams.create ~uri ~diagnostics () in
   send_notification (Server_notification.PublishDiagnostics params)
 
+let diagnostic_of_error { Lunno_common.Error.msg; span; _ } =
+  Diagnostic.create ~range:(span_to_range span)
+    ~severity:DiagnosticSeverity.Error ~message:(`String msg) ()
+
 let check_document uri source =
   Lunno_modules.Core.Init.init ();
   let uri_str = Uri.to_string uri in
   let diagnostics =
-    try
-      let lexbuf = Lexing.from_string source in
-      Lexing.set_filename lexbuf uri_str;
-      let prog =
-        Lunno_frontend.Parser.program Lunno_frontend.Lexer.token lexbuf
-      in
-      try
-        let typed = Lunno_lower.Typechecker.infer_program prog in
-        Hashtbl.replace typed_asts uri_str typed;
-        []
-      with Lunno_common.Error.TypeError { msg; span; _ } ->
-        [
-          Diagnostic.create ~range:(span_to_range span)
-            ~severity:DiagnosticSeverity.Error ~message:(`String msg) ();
-        ]
-    with
-    | Lunno_common.Error.ParserError { msg; span; _ } ->
-        [
-          Diagnostic.create ~range:(span_to_range span)
-            ~severity:DiagnosticSeverity.Error ~message:(`String msg) ();
-        ]
-    | Lunno_common.Error.LexerError { msg; span; _ } ->
-        [
-          Diagnostic.create ~range:(span_to_range span)
-            ~severity:DiagnosticSeverity.Error ~message:(`String msg) ();
-        ]
-    | _ -> []
+    let lexbuf = Lexing.from_string source in
+    Lexing.set_filename lexbuf uri_str;
+    match Lunno_driver.Cli.parse lexbuf with
+    | Error e -> [ diagnostic_of_error e ]
+    | Ok prog -> (
+        match Lunno_lower.Typechecker.infer_program prog with
+        | Error e -> [ diagnostic_of_error e ]
+        | Ok typed ->
+            Hashtbl.replace typed_asts uri_str typed;
+            [])
   in
   publish_diagnostics uri diagnostics
 
@@ -110,7 +97,9 @@ let rec collect_code_lenses acc expr =
       in
       collect_code_lenses (lens :: acc) let_body
   | Block (exprs, _, _) -> List.fold_left collect_code_lenses acc exprs
-  | _ -> acc
+  | Literal _ | Variable _ | Lambda _ | Apply _ | If _ | Match _ | Binary _
+  | Unary _ | MemberAccess _ | Range _ | Constructor _ ->
+      acc
 
 let handle_code_lens id params =
   let uri = params.CodeLensParams.textDocument.TextDocumentIdentifier.uri in
@@ -186,7 +175,9 @@ let rec collect_definitions_with_ty acc expr =
           acc params
       in
       collect_definitions_with_ty acc lambda_body
-  | _ -> acc
+  | Literal _ | Variable _ | Apply _ | If _ | Match _ | Binary _ | Unary _
+  | MemberAccess _ | Range _ | Constructor _ ->
+      acc
 
 let rec collect_identifiers acc expr =
   let open Lunno_common.Typed_ast in
@@ -203,7 +194,9 @@ let rec collect_identifiers acc expr =
           acc params
       in
       collect_identifiers acc lambda_body
-  | _ -> acc
+  | Literal _ | Variable _ | Apply _ | If _ | Match _ | Binary _ | Unary _
+  | MemberAccess _ | Range _ | Constructor _ ->
+      acc
 
 let extract_imports source =
   let lines = String.split_on_char '\n' source in
@@ -428,7 +421,9 @@ let rec collect_definitions acc expr =
           acc params
       in
       collect_definitions acc lambda_body
-  | _ -> acc
+  | Literal _ | Variable _ | Apply _ | If _ | Match _ | Binary _ | Unary _
+  | MemberAccess _ | Range _ | Constructor _ ->
+      acc
 
 let handle_goto_definition id params =
   let uri = params.DefinitionParams.textDocument.TextDocumentIdentifier.uri in
@@ -518,16 +513,71 @@ let dispatch_request raw_req =
           handle_completion id params
       | Client_request.TextDocumentDefinition params ->
           handle_goto_definition id params
-      | _ -> send_response id `Null)
+      | Client_request.TextDocumentDeclaration _
+      | Client_request.TextDocumentTypeDefinition _
+      | Client_request.TextDocumentImplementation _
+      | Client_request.TextDocumentInlineCompletion _
+      | Client_request.TextDocumentInlineValue _
+      | Client_request.TextDocumentCodeLensResolve _
+      | Client_request.TextDocumentPrepareCallHierarchy _
+      | Client_request.TextDocumentPrepareTypeHierarchy _
+      | Client_request.TextDocumentPrepareRename _
+      | Client_request.TextDocumentRangeFormatting _
+      | Client_request.TextDocumentRangesFormatting _
+      | Client_request.TextDocumentRename _ | Client_request.TextDocumentLink _
+      | Client_request.TextDocumentLinkResolve _
+      | Client_request.TextDocumentMoniker _ | Client_request.DocumentSymbol _
+      | Client_request.WorkspaceSymbol _
+      | Client_request.WorkspaceSymbolResolve _ | Client_request.DebugEcho _
+      | Client_request.DebugTextDocumentGet _
+      | Client_request.TextDocumentReferences _
+      | Client_request.TextDocumentHighlight _
+      | Client_request.TextDocumentFoldingRange _
+      | Client_request.SignatureHelp _ | Client_request.CodeAction _
+      | Client_request.CodeActionResolve _
+      | Client_request.CompletionItemResolve _ | Client_request.InlayHint _
+      | Client_request.InlayHintResolve _
+      | Client_request.TextDocumentDiagnostic _
+      | Client_request.WillSaveWaitUntilTextDocument _
+      | Client_request.TextDocumentFormatting _
+      | Client_request.TextDocumentOnTypeFormatting _
+      | Client_request.TextDocumentColorPresentation _
+      | Client_request.TextDocumentColor _ | Client_request.SelectionRange _
+      | Client_request.ExecuteCommand _ | Client_request.SemanticTokensFull _
+      | Client_request.SemanticTokensDelta _
+      | Client_request.SemanticTokensRange _
+      | Client_request.LinkedEditingRange _
+      | Client_request.CallHierarchyIncomingCalls _
+      | Client_request.CallHierarchyOutgoingCalls _
+      | Client_request.WillCreateFiles _ | Client_request.WillDeleteFiles _
+      | Client_request.WillRenameFiles _ | Client_request.WorkspaceDiagnostic _
+      | Client_request.TypeHierarchySubtypes _
+      | Client_request.TypeHierarchySupertypes _
+      | Client_request.UnknownRequest _ ->
+          send_response id `Null)
 
 let dispatch_notification notif =
   match notif with
   | Client_notification.TextDocumentDidOpen params -> handle_did_open params
   | Client_notification.TextDocumentDidChange params -> handle_did_change params
   | Client_notification.TextDocumentDidClose params -> handle_did_close params
-  | Client_notification.Initialized -> ()
   | Client_notification.Exit -> exit 0
-  | _ -> ()
+  | Client_notification.Initialized | Client_notification.DidSaveTextDocument _
+  | Client_notification.WillSaveTextDocument _
+  | Client_notification.DidChangeWatchedFiles _
+  | Client_notification.DidCreateFiles _ | Client_notification.DidDeleteFiles _
+  | Client_notification.DidRenameFiles _
+  | Client_notification.ChangeWorkspaceFolders _
+  | Client_notification.ChangeConfiguration _
+  | Client_notification.CancelRequest _
+  | Client_notification.WorkDoneProgressCancel _
+  | Client_notification.SetTrace _ | Client_notification.WorkDoneProgress _
+  | Client_notification.NotebookDocumentDidOpen _
+  | Client_notification.NotebookDocumentDidChange _
+  | Client_notification.NotebookDocumentDidSave _
+  | Client_notification.NotebookDocumentDidClose _
+  | Client_notification.UnknownNotification _ ->
+      ()
 
 let run () =
   let rec loop () =

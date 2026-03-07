@@ -89,18 +89,28 @@
 
 %nonassoc THEN
 %nonassoc KwElse
-
-%on_error_reduce call_expr
+%nonassoc BelowApp
+%left LeftParen
 
 %start program
 %type <Lunno_common.Ast.program> program
-%type <Lunno_common.Ast.ty> type_expr type_primary ret_type ret_type_primary param_type
-%type <Lunno_common.Ast.ty list> type_expr_list ret_type_list
-%type <Lunno_common.Ast.pattern> pattern cons_pattern primary_pattern
+%type <Lunno_common.Ast.expr> expr primary_expr additive_expr multiplicative_expr comparison_expr cons_expr call_expr block_expr if_expr let_expr match_expr member_expr
+%type <Lunno_common.Ast.expr list> expr_list arg_list
+%type <Lunno_common.Ast.pattern> pattern primary_pattern cons_pattern
+%type <Lunno_common.Ast.pattern list> pattern_list
 %type <Lunno_common.Ast.match_case> match_case
 %type <Lunno_common.Ast.match_case list> match_cases
 %type <Lunno_common.Ast.import> import
 %type <Lunno_common.Ast.import list> import_list
+%type <Lunno_common.Ast.ty> type_expr type_primary ret_type ret_type_primary param_type param_type_primary
+%type <Lunno_common.Ast.ty list> type_expr_list ret_type_list param_type_list variant_field_list
+%type <Lunno_common.Ast.param> param
+%type <Lunno_common.Ast.param list> param_list param_or_group
+%type <Lunno_common.Ast.variant> variant
+%type <Lunno_common.Ast.variant list> variant_list
+%type <(string * Lunno_common.Span.t) list> identifier_list
+%type <Lunno_common.Ast.type_decl> type_decl
+%type <Lunno_common.Ast.type_decl list> type_decl_list
 
 %%
 
@@ -179,7 +189,7 @@ additive_expr:
 multiplicative_expr:
     | multiplicative_expr Asterisk primary_expr { Binary { binary_op = OpMul; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
     | multiplicative_expr Slash primary_expr { Binary { binary_op = OpDiv; left = $1; right = $3; binary_span = merge (`Expr $1) (`Expr $3) } }
-    | call_expr { $1 }
+    | call_expr { $1 }  %prec BelowApp
 
 call_expr:
     | call_expr LeftParen RightParen { Apply ($1, [], merge (`Expr $1) (`Span $3)) }

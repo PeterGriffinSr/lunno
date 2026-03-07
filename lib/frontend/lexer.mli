@@ -1,3 +1,7 @@
+exception LexError of Lunno_common.Error.compiler_error
+(** Internal exception used to propagate lexical errors through the Menhir
+    supplier. Caught and converted to [Error.result] at the CLI boundary. *)
+
 val token : Lexing.lexbuf -> Parser.token
 (** [token lexbuf] reads and returns the next token from the given lexing
     buffer.
@@ -8,6 +12,6 @@ val token : Lexing.lexbuf -> Parser.token
 
     @param lexbuf The lexing buffer containing the input source code.
     @return The next token of type [Parser.token].
-    @raise Lunno_common.Error.LexerError
+    @raise LexError
       Raised if an invalid character, malformed number, or other lexical error
       is encountered. *)

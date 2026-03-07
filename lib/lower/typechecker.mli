@@ -1,7 +1,9 @@
-val infer_program : Lunno_common.Ast.program -> Lunno_common.Typed_ast.program
-(** [infer_program program] infers types for the given program, raising on the
-    first error encountered.
+val infer_program :
+  Lunno_common.Ast.program ->
+  Lunno_common.Typed_ast.program Lunno_common.Error.result
+(** [infer_program program] infers and checks types for [program], returning a
+    [result] containing either the fully typed and monomorphized AST or a
+    [compiler_error] describing the first type error encountered.
 
-    @param program The AST program to infer types for.
-    @raise Lunno_common.Error.TypeError Raised if a type error is encountered.
-*)
+    @param program The AST program to typecheck.
+    @return [Ok typed_program] on success or [Error e] on a type error. *)

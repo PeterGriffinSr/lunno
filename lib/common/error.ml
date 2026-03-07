@@ -22,9 +22,20 @@ type error_code =
   | E_Type_MissingMain
   | E_Type_TopLevelExpression
 
-exception LexerError of { code : error_code; msg : string; span : Span.t }
-exception TypeError of { code : error_code; msg : string; span : Span.t }
-exception ParserError of { code : error_code; msg : string; span : Span.t }
+type error_kind = LexError | ParseError | TypeError
+
+type compiler_error = {
+  kind : error_kind;
+  code : error_code;
+  msg : string;
+  span : Span.t;
+}
+
+type 'a result = ('a, compiler_error) Stdlib.Result.t
+
+let lex_error code msg span = Error { kind = LexError; code; msg; span }
+let parse_error code msg span = Error { kind = ParseError; code; msg; span }
+let type_error code msg span = Error { kind = TypeError; code; msg; span }
 
 let string_of_code = function
   | E_Lex_UnexpectedChar -> "E1001"
@@ -48,22 +59,24 @@ let string_of_code = function
   | E_Type_MissingMain -> "E3011"
   | E_Type_TopLevelExpression -> "E3012"
 
-let print_error lines = function
-  | LexerError { code; msg; span = start_pos, _ }
-  | ParserError { code; msg; span = start_pos, _ }
-  | TypeError { code; msg; span = start_pos, _ } ->
-      let line_num = start_pos.pos_lnum in
-      let col = start_pos.pos_cnum - start_pos.pos_bol + 1 in
-      let line =
-        if line_num > 0 && line_num <= Array.length lines then
-          lines.(line_num - 1)
-        else ""
-      in
-      let gutter = String.length (string_of_int line_num) in
-      let pad = String.make gutter ' ' in
-      Printf.eprintf "Error[%s]: %s\n" (string_of_code code) msg;
-      Printf.eprintf " %s--> line %d, column %d\n" pad line_num col;
-      Printf.eprintf "  %d | %s\n" line_num line;
-      Printf.eprintf "  %s | %s^\n" pad (String.make (col - 1) ' ');
-      flush stderr
-  | _ -> ()
+let string_of_kind = function
+  | LexError -> "Lexer"
+  | ParseError -> "Parser"
+  | TypeError -> "Type"
+
+let print_error lines { kind = _; code; msg; span = start_pos, _ } =
+  let line_num = start_pos.pos_lnum in
+  let col = start_pos.pos_cnum - start_pos.pos_bol + 1 in
+  let line =
+    if line_num > 0 && line_num <= Array.length lines then lines.(line_num - 1)
+    else ""
+  in
+  let gutter = String.length (string_of_int line_num) in
+  let pad = String.make gutter ' ' in
+  Printf.eprintf "Error[%s]: %s\n" (string_of_code code) msg;
+  Printf.eprintf " %s--> line %d, column %d\n" pad line_num col;
+  Printf.eprintf "  %d | %s\n" line_num line;
+  Printf.eprintf "  %s | %s^\n" pad (String.make (col - 1) ' ');
+  flush stderr
+
+let ( let* ) = Stdlib.Result.bind

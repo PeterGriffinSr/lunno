@@ -37,6 +37,9 @@
         let start = Lexing.lexeme_start_p lexbuf in
         let stop = Lexing.lexeme_end_p lexbuf in
         ctor (start, stop)
+    exception LexError of Error.compiler_error
+    let lex_err code msg span =
+        LexError { Error.kind = Error.LexError; code; msg; span }
 }
 
 let identifier = ['a'-'z' 'A'-'Z' '_'](['a'-'z' 'A'-'Z' '_' '0'-'9' '\''])*
@@ -77,29 +80,17 @@ rule token = parse
         with_pos lexbuf (fun span ->
             try FloatingPoint (float_of_string (strip_underscores f), span)
             with Failure _ ->
-                raise (Error.LexerError {
-                    code = Error.E_Lex_InvalidFloat;
-                    msg  = "Invalid floating-point literal";
-                    span = span;
-                }))
+                raise (lex_err Error.E_Lex_InvalidFloat "Invalid floating-point literal" span))
     }
     | digits '_' ([^'0'-'9'] | eof) {
         with_pos lexbuf (fun span ->
-            raise (Error.LexerError {
-                code = Error.E_Lex_InvalidInt;
-                msg = "Trailing underscore in integer literal";
-                span;
-            }))
+            raise (lex_err Error.E_Lex_InvalidInt "Trailing underscore in integer literal" span))
     }
     | int_literal as i {
         with_pos lexbuf (fun span ->
             try Integer (Int64.of_string (strip_underscores i), span)
             with Failure _ ->
-                raise (Error.LexerError {
-                    code = Error.E_Lex_InvalidInt;
-                    msg  = "Invalid integer literal";
-                    span = span;
-                }))
+                raise (lex_err Error.E_Lex_InvalidInt "Invalid integer literal" span))
     }
     | identifier as id { 
         match Hashtbl.find_opt reserved id with
@@ -115,22 +106,17 @@ rule token = parse
         EndOfFile (pos, pos) }
     | _ as c {
         with_pos lexbuf (fun span ->
-            raise (Error.LexerError {
-                code = Error.E_Lex_UnexpectedChar;
-                msg  = Printf.sprintf "Unexpected character: %S" (String.make 1 c);
-                span = span;
-            }))
+            raise (lex_err Error.E_Lex_UnexpectedChar
+                (Printf.sprintf "Unexpected character: %S" (String.make 1 c)) span))
     }
 and read_string buffer start_pos = parse
     | '"' { 
         with_pos lexbuf (fun end_span ->
             let s = Buffer.contents buffer in
             if String.length s = 0 then 
-                raise (Error.LexerError {
-                    code = Error.E_Lex_EmptyString;
-                    msg  = "Empty string literals are not allowed";
-                    span = (start_pos, snd end_span);
-                })
+                raise (lex_err Error.E_Lex_EmptyString
+                    "Empty string literals are not allowed"
+                    (start_pos, snd end_span))
             else
                 String (s, end_span))
     }
@@ -148,25 +134,17 @@ and read_string buffer start_pos = parse
         read_string buffer start_pos lexbuf
     }
     | '\\' (_ as c) {
-      raise (Error.LexerError {
-        code = Error.E_Lex_InvalidEscape;
-        msg  = Printf.sprintf "Invalid escape sequence in string literal '\\%c'" c;
-        span = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf);
-      })
+        raise (lex_err Error.E_Lex_InvalidEscape
+            (Printf.sprintf "Invalid escape sequence in string literal '\\%c'" c)
+            (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf))
     }
     | '\n' {  
-        raise (Error.LexerError {
-            code = Error.E_Lex_NewlineInString;
-            msg  = "Newline in string literal";
-            span = (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf);
-        }) 
+        raise (lex_err Error.E_Lex_NewlineInString "Newline in string literal"
+            (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf))
     }
     | eof { 
-        raise (Error.LexerError {
-            code = Error.E_Lex_UnterminatedString;
-            msg  = "Unterminated string literal";
-            span = (start_pos, Lexing.lexeme_end_p lexbuf);
-        })
+        raise (lex_err Error.E_Lex_UnterminatedString "Unterminated string literal"
+            (start_pos, Lexing.lexeme_end_p lexbuf))
     }
     | _ as c { Buffer.add_char buffer c; read_string buffer start_pos lexbuf }
 and read_comment = parse

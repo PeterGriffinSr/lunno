@@ -1,13 +1,22 @@
 open Lunno
 
+let unwrap lines = function
+  | Ok v -> v
+  | Error e ->
+      Lunno_common.Error.print_error lines e;
+      exit 1
+
 let process_file dump_mode filename =
-  let lines, prog = parse_file filename in
+  let lines, prog_result = parse_file filename in
   match dump_mode with
-  | Some Flags.DumpUntyped -> Debug.dump_program_untyped prog
+  | Some Flags.DumpUntyped ->
+      Debug.dump_program_untyped (unwrap lines prog_result)
   | Some Flags.DumpTyped ->
-      Debug.dump_program_typed (typecheck_program lines prog)
+      let prog = unwrap lines prog_result in
+      Debug.dump_program_typed (unwrap lines (typecheck_program lines prog))
   | None ->
-      let _ = typecheck_program lines prog in
+      let prog = unwrap lines prog_result in
+      let _ = unwrap lines (typecheck_program lines prog) in
       Printf.eprintf "error: compilation not yet implemented\n%!";
       exit 1
 

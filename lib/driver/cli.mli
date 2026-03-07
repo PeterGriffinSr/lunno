@@ -1,24 +1,22 @@
 val read_file_lines : string -> string array
-(** [read_file_lines filename] reads all lines from the file [filename] and
-    returns them as a string array. The file is safely closed even if an
-    exception occurs. *)
+(** [read_file_lines filename] reads all lines from [filename] and returns them
+    as a string array. The file is safely closed even if an exception occurs. *)
 
-val parse : Lexing.lexbuf -> string array -> Lunno_common.Ast.program
-(** [parse lexbuf lines] parses the input from [lexbuf] and returns the
-    resulting AST program.
+val parse : Lexing.lexbuf -> Lunno_common.Ast.program Lunno_common.Error.result
+(** [parse lexbuf] lexes and parses the input from [lexbuf], returning a
+    [result] containing either the parsed AST or a [compiler_error].
 
-    @param lexbuf The lexing buffer to read from.
-    @param lines
-      The array of source lines for error reporting. Exits the program with code
-      [1] if a [LexerError] or [ParserError] is raised, printing a formatted
-      error message. *)
+    Lexer errors are caught at this boundary and converted from the internal
+    [Lexer.LexError] exception into [Error e].
+
+    @param lexbuf The lexing buffer to read tokens from.
+    @return [Ok program] on success or [Error e] on a lex or parse error. *)
 
 val typecheck :
-  Lunno_common.Ast.program -> string array -> Lunno_common.Typed_ast.program
-(** [typecheck program lines] typechecks [program] and returns the resulting
-    typed AST program on success.
+  Lunno_common.Ast.program ->
+  Lunno_common.Typed_ast.program Lunno_common.Error.result
+(** [typecheck program] typechecks [program] and returns a [result] containing
+    either the typed AST or a [compiler_error].
 
     @param program The AST program to typecheck.
-    @param lines
-      The array of source lines for error reporting. Exits the program with code
-      [1] if a type error is encountered, printing a formatted error message. *)
+    @return [Ok typed_program] on success or [Error e] on a type error. *)

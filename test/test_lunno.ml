@@ -47,19 +47,21 @@ let assert_lexer_error ~ctxt input expected_code =
   try
     let _ = lex_exn input in
     assert_failure "Expected LexerError, but none was raised"
-  with Error.LexerError e ->
+  with Lexer.LexError e ->
     assert_equal ~ctxt ~printer:Error.string_of_code expected_code e.code
 
 let check s =
-  let prog = parse_program s in
-  let _ = Typechecker.infer_program prog in
-  ()
+  let lexbuf = Lexing.from_string s in
+  match Lunno_driver.Cli.parse lexbuf with
+  | Error e -> Error e
+  | Ok prog -> Lunno_lower.Typechecker.infer_program prog
 
 let assert_ok ~ctxt:_ s =
-  try check s
-  with Error.TypeError { msg; _ } ->
-    assert_failure
-      (Printf.sprintf "Expected OK but got type error: %s\nInput: %s" msg s)
+  match check s with
+  | Ok _ -> ()
+  | Error { Error.msg; _ } ->
+      assert_failure
+        (Printf.sprintf "Expected OK but got type error: %s\nInput: %s" msg s)
 
 let test_simple_tokens ctxt =
   assert_tokens ~ctxt "(){}[]"
@@ -1550,14 +1552,14 @@ let test_adt_constructor_pattern_with_wildcard ctxt =
   | _ -> assert_failure "Expected constructor pattern with wildcard"
 
 let assert_error ~ctxt:_ ?(code = None) s =
-  try
-    check s;
-    assert_failure
-      (Printf.sprintf "Expected type error but got none\nInput: %s" s)
-  with Error.TypeError { code = actual_code; _ } -> (
-    match code with
-    | Some expected -> assert_equal expected actual_code
-    | None -> ())
+  match check s with
+  | Ok _ ->
+      assert_failure
+        (Printf.sprintf "Expected type error but got none\nInput: %s" s)
+  | Error { Error.code = actual_code; _ } -> (
+      match code with
+      | Some expected -> assert_equal expected actual_code
+      | None -> ())
 
 let tc_test_int_literal ctxt = assert_ok ~ctxt "42"
 let tc_test_float_literal ctxt = assert_ok ~ctxt "3.14"

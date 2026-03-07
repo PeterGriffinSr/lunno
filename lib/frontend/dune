@@ -1,10 +1,10 @@
 (library
  (name lunno_frontend)
  (public_name lunno.frontend)
- (libraries lunno.common lunno.modules menhirLib))
+ (libraries lunno.common menhirLib))
 
 (ocamllex lexer)
 
 (menhir
  (modules parser)
- (flags --lalr --table))
+ (flags --strict --lalr --table))
