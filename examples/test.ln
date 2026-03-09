@@ -1,16 +1,3 @@
-import "core:io"
-
-let a(f, x) {
-    f(x :: [1, 2])
-}
-
-let main {
-    let x = 10
-    match x {
-        | 10 -> io.println("Ten")
-        | _ -> match x = 20 {
-            | true -> io.println("20")
-            | false -> io.println("false")
-        }
-    }
+let main -> unit {
+    ()
 }

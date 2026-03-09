@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.10.4] - 2026-03-08
+
+### Changed
+- Updated Test Suite to add more test and split test into modules.
+- Simplified doc-comments for mli files.
+
 ## [0.10.3] - 2026-03-07
 
 ### Changed
