@@ -4,7 +4,7 @@
 
 (name lunno)
 
-(version 0.10.4)
+(version 0.11.0)
 
 (generate_opam_files true)
 
@@ -31,18 +31,8 @@
     (< 5.5.0)))
   (dune
    (>= 3.21))
-  (lsp
-   (>= 1.25.0))
-  (jsonrpc
-   (>= 1.25.0))
-  (menhir
-   (>= 20260209))
-  (cmdliner
-    (>= 2.1.0))
-  (ounit2
-   (and
-    :with-test
-    (= 2.2.7))))
+  (coq
+   (>= 9.1.0)))
  (depopts
   (merlin :dev))
  (tags

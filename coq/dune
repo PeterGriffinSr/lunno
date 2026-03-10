@@ -1,0 +1,17 @@
+(rule
+ (targets Token.vo)
+ (deps Token.v)
+ (action
+  (run coqc %{dep:Token.v})))
+
+(rule
+ (targets Lexer.vo)
+ (deps Lexer.v Token.vo)
+ (action
+  (run coqc -Q . "" %{dep:Lexer.v})))
+
+(rule
+ (targets lexer.ml lexer.mli)
+ (deps Extract.v Token.vo Lexer.vo)
+ (action
+  (run coqc -Q . "" -output-directory . %{dep:Extract.v})))

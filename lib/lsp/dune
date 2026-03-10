@@ -1,4 +1,0 @@
-(library
- (name lunno_lsp)
- (public_name lunno.lsp)
- (libraries lsp lunno.driver lunno.modules lunno.frontend lunno.lower))

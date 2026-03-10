@@ -14,11 +14,7 @@ bug-reports: "https://github.com/PeterGriffinSr/lunno/issues"
 depends: [
   "ocaml" {>= "5.0.0" & < "5.5.0"}
   "dune" {>= "3.21" & >= "3.21"}
-  "lsp" {>= "1.25.0"}
-  "jsonrpc" {>= "1.25.0"}
-  "menhir" {>= "20260209"}
-  "cmdliner" {>= "2.1.0"}
-  "ounit2" {with-test & = "2.2.7"}
+  "coq" {>= "9.1.0"}
   "odoc" {with-doc}
 ]
 depopts: [

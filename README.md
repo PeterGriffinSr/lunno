@@ -43,22 +43,14 @@ cd lunno
 
 **2. Install dependencies:**
 
-For users:
-
 ```sh
 opam install . --deps-only
-```
-
-For contributors:
-
-```sh
-opam install . --deps-only --with-test
 ```
 
 ---
 
 ## Contributing
-We'd love your help! Contributors should install dependencies with the `--with-test` flag (see above) to run the full test suite.
+We'd love your help!
 
 ---
 

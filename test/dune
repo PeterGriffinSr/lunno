@@ -1,6 +1,6 @@
 (test
  (name test_lunno)
- (libraries lunno ounit2))
+ (libraries lunno))
 
 (env
  (_

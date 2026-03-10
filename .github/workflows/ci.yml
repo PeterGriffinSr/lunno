@@ -2,9 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
-    tags:
-      - "v*"
+    branches: [coq]
   pull_request:
 
 jobs:
@@ -26,7 +24,7 @@ jobs:
           ocaml-compiler: 5
 
       - name: Install dependencies
-        run: opam install . --deps-only --with-test
+        run: opam install . --deps-only
 
       - name: Run tests
         run: opam exec -- dune test

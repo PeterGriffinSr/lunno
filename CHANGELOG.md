@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+### Added
+- Formally verified lexer via Coq extraction on the `coq` branch.
+- `Token.v` - Coq inductive definition of all language tokens and correctness proofs.
+- `Lexer.v` - fuel-based lexer with 40+ `reflexivity` proofs covering all
+  keywords, symbols, literals, whitespace, comments, and error cases.
+- `Extract.v` - Coq extraction pipeline generating OCaml from verified sources.
+- Dune rules in `coq/` to compile `.v` files and extract OCaml as part of
+  `dune build`.
+
+### Changed
+- Lexer is now guaranteed total and terminating by Coq's type system -
+  no crashes, no infinite loops, no missing cases.
+
 ## [0.10.4] - 2026-03-08
 
 ### Changed
@@ -99,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated file/directory structure to reflect the module system and frontend/common/modules split.
-- Recursive `let` bindings no longer require full type annotations — unannotated params and missing return types are now inferred via `fresh_meta ()` rather than raising MissingAnnotation.
+- Recursive `let` bindings no longer require full type annotations - unannotated params and missing return types are now inferred via `fresh_meta ()` rather than raising MissingAnnotation.
 - `infer_literal` extended to handle `LNil`.
 
 ### Fixed

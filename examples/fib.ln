@@ -11,5 +11,6 @@ let fib(n) {
 }
 
 let main {
-    io.println(fib(10))
+    let x: i32 = 10
+    io.println(fib(x))
 }

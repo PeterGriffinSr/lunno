@@ -1,9 +1,0 @@
-(library
- (name lunno_driver)
- (public_name lunno.driver)
- (libraries lunno.frontend lunno.lower lunno.common cmdliner))
-
-(rule
- (target version.ml)
- (action
-  (write-file %{target} "let version = \"%{version:lunno}\"")))
