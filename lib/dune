@@ -1,16 +1,3 @@
 (library
  (name lunno)
- (flags
-  (:standard -w -4-39)))
-
-(rule
- (targets lexer.ml)
- (deps ../coq/lexer.ml)
- (action
-  (copy ../coq/lexer.ml lexer.ml)))
-
-(rule
- (targets lexer.mli)
- (deps ../coq/lexer.mli)
- (action
-  (copy ../coq/lexer.mli lexer.mli)))
+ (libraries lunno.driver lunno.common lunno.debug))

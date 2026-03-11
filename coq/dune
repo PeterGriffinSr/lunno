@@ -2,7 +2,13 @@
  (targets Token.vo)
  (deps Token.v)
  (action
-  (run coqc %{dep:Token.v})))
+  (run coqc -Q . "" %{dep:Token.v})))
+
+(rule
+ (targets Ast.vo)
+ (deps Ast.v Token.vo)
+ (action
+  (run coqc -Q . "" %{dep:Ast.v})))
 
 (rule
  (targets Lexer.vo)
@@ -11,7 +17,29 @@
   (run coqc -Q . "" %{dep:Lexer.v})))
 
 (rule
- (targets lexer.ml lexer.mli)
- (deps Extract.v Token.vo Lexer.vo)
+ (targets Lexer_proofs.vo)
+ (deps Lexer_proofs.v Token.vo Lexer.vo)
+ (action
+  (run coqc -Q . "" %{dep:Lexer_proofs.v})))
+
+(rule
+ (targets Parser.vo)
+ (deps Parser.v Token.vo Ast.vo Lexer.vo)
+ (action
+  (run coqc -Q . "" %{dep:Parser.v})))
+
+(rule
+ (targets Parser_proofs.vo)
+ (deps Parser_proofs.v Token.vo Ast.vo Lexer.vo Parser.vo)
+ (action
+  (run coqc -Q . "" %{dep:Parser_proofs.v})))
+
+(rule
+ (targets lunno.ml lunno.mli)
+ (deps Extract.v Token.vo Ast.vo Lexer.vo Parser.vo)
  (action
   (run coqc -Q . "" -output-directory . %{dep:Extract.v})))
+
+(alias
+ (name runtest)
+ (deps Lexer_proofs.vo Parser_proofs.vo))

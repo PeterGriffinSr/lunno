@@ -1,8 +1,0 @@
-(test
- (name test_lunno)
- (libraries lunno))
-
-(env
- (_
-  (flags
-   (:standard -w -a))))

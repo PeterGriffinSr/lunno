@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project is under active early development.
 - APIs and language features may change without notice.
 
+## [0.12.0] - 2026-03-11
+
+### Added
+- Formally verified parser and ast via Coq extraction on the `coq` branch.
+
+## [0.11.0] - 2026-03-10
+
 ### Added
 - Formally verified lexer via Coq extraction on the `coq` branch.
 - `Token.v` - Coq inductive definition of all language tokens and correctness proofs.

@@ -10,6 +10,7 @@ Inductive token : Type :=
   | TElse
   | TMatch
   | TImport
+  | TData
   | TTrue
   | TFalse
   | TInt

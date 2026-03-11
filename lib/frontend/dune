@@ -1,0 +1,16 @@
+(library
+ (name lunno_frontend)
+ (public_name lunno.frontend)
+ (libraries lunno.common))
+
+(rule
+ (targets lunno.ml)
+ (deps ../../coq/lunno.ml)
+ (action
+  (copy ../../coq/lunno.ml lunno.ml)))
+
+(rule
+ (targets lunno.mli)
+ (deps ../../coq/lunno.mli)
+ (action
+  (copy ../../coq/lunno.mli lunno.mli)))
